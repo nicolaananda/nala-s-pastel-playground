@@ -87,7 +87,7 @@ const ArtClasses = () => {
               )}
               
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300" as="h3">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300">
                   {artClass.level}
                 </CardTitle>
                 <CardDescription className="text-sm sm:text-base text-muted-foreground mt-2">

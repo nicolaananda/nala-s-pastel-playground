@@ -29,34 +29,9 @@ export default defineConfig({
   build: {
     // Optimize build output
     minify: 'esbuild', // Faster than terser
-    // Code splitting - more granular for better tree shaking
+    // Code splitting - let Vite handle automatically to avoid React issues
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          // React core
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
-            return 'react-core';
-          }
-          // React Router
-          if (id.includes('node_modules/react-router')) {
-            return 'react-router';
-          }
-          // Radix UI components - split by usage
-          if (id.includes('node_modules/@radix-ui')) {
-            if (id.includes('accordion') || id.includes('dialog') || id.includes('dropdown-menu')) {
-              return 'radix-ui-core';
-            }
-            return 'radix-ui-other';
-          }
-          // TanStack Query
-          if (id.includes('node_modules/@tanstack')) {
-            return 'tanstack-query';
-          }
-          // Other large dependencies
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
-        },
         // Optimize chunk file names
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
@@ -64,7 +39,7 @@ export default defineConfig({
       },
     },
     // Chunk size warning limit
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1000,
     // Source maps for production (optional, set to false for smaller builds)
     sourcemap: false,
     // CSS code splitting

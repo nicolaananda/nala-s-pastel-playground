@@ -9,9 +9,9 @@ const GraspGuide = () => {
         <Card className="border-2 border-border rounded-2xl sm:rounded-3xl shadow-soft hover:shadow-hover transition-smooth overflow-hidden">
           <div className="h-3 sm:h-4 gradient-pink-blue" />
           <CardHeader className="text-center p-4 sm:p-6">
-            <CardTitle className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2" as="h2">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">
               🧸 Panduan Nama Grasp
-            </CardTitle>
+            </h2>
             <CardDescription className="text-sm sm:text-base text-muted-foreground leading-relaxed">
               Tersedia nama dan nomor Grasp serta panduan warna untuk mencocokkan crayon Grasp kamu.
             </CardDescription>
