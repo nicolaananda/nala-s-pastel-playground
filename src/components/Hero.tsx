@@ -1,8 +1,10 @@
 // @ts-ignore - vite-imagetools handles this
-import cloudBg from "@/assets/cloud-background.jpg?w=1920&format=webp";
+import cloudBg from "@/assets/cloud-background.jpg?w=1920&format=webp&quality=80";
 import cloudBgFallback from "@/assets/cloud-background.jpg";
 // @ts-ignore - vite-imagetools handles this
-import nalaLogo from "@/assets/nala-logo.png?w=896&format=webp";
+import nalaLogo from "@/assets/nala-logo.png?w=448&format=webp&quality=85";
+// @ts-ignore - vite-imagetools handles this
+import nalaLogo2x from "@/assets/nala-logo.png?w=896&format=webp&quality=85";
 import nalaLogoFallback from "@/assets/nala-logo.png";
 
 const Hero = () => {
@@ -22,14 +24,14 @@ const Hero = () => {
       >
         <picture>
           <source srcSet={cloudBg} type="image/webp" />
-          <img 
-            src={cloudBgFallback} 
-            alt="" 
-            className="absolute inset-0 w-full h-full object-cover opacity-0"
-            loading="eager"
-            fetchPriority="high"
-            aria-hidden="true"
-          />
+        <img 
+          src={cloudBgFallback} 
+          alt="Background awan untuk Nala Art Studio" 
+          className="absolute inset-0 w-full h-full object-cover opacity-0"
+          loading="eager"
+          fetchPriority="high"
+          aria-hidden="true"
+        />
         </picture>
       </div>
       
@@ -52,7 +54,10 @@ const Hero = () => {
         {/* Logo with fun animations */}
         <div className="mb-6 sm:mb-8 animate-bounce-in">
           <picture>
-            <source srcSet={nalaLogo} type="image/webp" />
+            <source 
+              srcSet={`${nalaLogo} 1x, ${nalaLogo2x} 2x`} 
+              type="image/webp" 
+            />
             <img 
               src={nalaLogoFallback} 
               alt="Nala Art Studio Logo" 

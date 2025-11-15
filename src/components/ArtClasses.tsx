@@ -1,12 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 // @ts-ignore - vite-imagetools handles this
-import beginnerImg from "@/assets/beginner-class.jpg?w=800&format=webp";
+import beginnerImg from "@/assets/beginner-class.jpg?w=800&format=webp&quality=75";
 import beginnerImgFallback from "@/assets/beginner-class.jpg";
 // @ts-ignore - vite-imagetools handles this
-import intermediateImg from "@/assets/intermediate-class.jpg?w=800&format=webp";
+import intermediateImg from "@/assets/intermediate-class.jpg?w=800&format=webp&quality=70";
 import intermediateImgFallback from "@/assets/intermediate-class.jpg";
 // @ts-ignore - vite-imagetools handles this
-import advancedImg from "@/assets/advanced-class.jpg?w=800&format=webp";
+import advancedImg from "@/assets/advanced-class.jpg?w=800&format=webp&quality=75";
 import advancedImgFallback from "@/assets/advanced-class.jpg";
 
 const classes = [
@@ -87,7 +87,7 @@ const ArtClasses = () => {
               )}
               
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300">
+                <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300" as="h3">
                   {artClass.level}
                 </CardTitle>
                 <CardDescription className="text-sm sm:text-base text-muted-foreground mt-2">

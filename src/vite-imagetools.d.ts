@@ -16,17 +16,17 @@ declare module '*?w=*' {
 }
 
 // For vite-imagetools
-declare module '*.jpg?w=*&format=webp' {
+declare module '*.jpg?w=*&format=webp*' {
   const src: string;
   export default src;
 }
 
-declare module '*.png?w=*&format=webp' {
+declare module '*.png?w=*&format=webp*' {
   const src: string;
   export default src;
 }
 
-declare module '*.jpeg?w=*&format=webp' {
+declare module '*.jpeg?w=*&format=webp*' {
   const src: string;
   export default src;
 }
