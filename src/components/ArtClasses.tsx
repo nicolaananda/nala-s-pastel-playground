@@ -40,14 +40,14 @@ const classes = [
 
 const ArtClasses = () => {
   return (
-    <section id="kelas-seni" className="py-20 px-4 bg-background">
+    <section id="kelas-seni" className="py-20 px-4 bg-gradient-to-br from-accent/20 via-background to-muted/30">
       <div className="container mx-auto max-w-6xl">
-        <div className="text-center mb-16 animate-fade-in">
+        <div className="text-center mb-16 animate-fade-in sparkle">
           <h2 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
             🎨 Kelas Seni Nala
           </h2>
-          <p className="text-xl md:text-2xl text-muted-foreground">
-            Pilih level sesuai kemampuanmu
+          <p className="text-xl md:text-2xl text-primary font-semibold">
+            Pilih level sesuai kemampuanmu 🌟
           </p>
         </div>
         
@@ -55,8 +55,8 @@ const ArtClasses = () => {
           {classes.map((artClass, index) => (
             <Card 
               key={index}
-              className="border-2 border-border rounded-3xl shadow-soft hover:shadow-hover transition-smooth hover:scale-105 animate-scale-in overflow-hidden"
-              style={{ animationDelay: `${index * 0.1}s` }}
+              className="border-4 border-primary/30 rounded-3xl shadow-hover hover:shadow-soft transition-bounce hover:scale-110 hover:rotate-2 animate-bounce-in overflow-hidden bg-gradient-to-br from-card to-secondary/10"
+              style={{ animationDelay: `${index * 0.15}s` }}
             >
               {artClass.image ? (
                 <div className="h-48 overflow-hidden">
