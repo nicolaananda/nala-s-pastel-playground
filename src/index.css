@@ -8,50 +8,59 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* Pastel Pink & Blue Theme */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 340 15% 25%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 340 15% 25%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 340 15% 25%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Baby Pink Primary */
+    --primary: 335 100% 81%;
+    --primary-foreground: 340 15% 25%;
+    
+    /* Baby Blue Secondary */
+    --secondary: 200 100% 85%;
+    --secondary-foreground: 340 15% 25%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Soft Pastels */
+    --muted: 335 100% 93%;
+    --muted-foreground: 340 15% 50%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 200 100% 93%;
+    --accent-foreground: 340 15% 25%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 335 50% 90%;
+    --input: 335 50% 90%;
+    --ring: 335 100% 81%;
 
-    --radius: 0.5rem;
+    --radius: 1rem;
+    
+    /* Gradients */
+    --gradient-pink-blue: linear-gradient(135deg, hsl(335 100% 81%), hsl(200 100% 85%));
+    --gradient-pink: linear-gradient(135deg, hsl(335 100% 81%), hsl(335 100% 93%));
+    --gradient-blue: linear-gradient(135deg, hsl(200 100% 85%), hsl(200 100% 93%));
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 20px hsla(335, 100%, 81%, 0.15);
+    --shadow-hover: 0 8px 30px hsla(335, 100%, 81%, 0.25);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -100,6 +109,32 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-jakarta;
+  }
+}
+
+@layer utilities {
+  .gradient-pink-blue {
+    background: var(--gradient-pink-blue);
+  }
+  
+  .gradient-pink {
+    background: var(--gradient-pink);
+  }
+  
+  .gradient-blue {
+    background: var(--gradient-blue);
+  }
+  
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+  
+  .shadow-hover {
+    box-shadow: var(--shadow-hover);
+  }
+  
+  .transition-smooth {
+    transition: var(--transition-smooth);
   }
 }
