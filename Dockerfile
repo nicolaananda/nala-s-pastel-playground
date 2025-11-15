@@ -1,6 +1,13 @@
 # Build stage
 FROM node:20-alpine AS builder
 
+# Install dependencies for sharp (image processing)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    vips-dev
+
 WORKDIR /app
 
 # Copy package files
@@ -8,12 +15,12 @@ COPY package*.json ./
 COPY bun.lockb* ./
 
 # Install dependencies
-RUN npm ci
+RUN npm ci --include=dev
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application (this will generate WebP images)
 RUN npm run build
 
 # Production stage
