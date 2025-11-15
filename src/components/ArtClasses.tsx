@@ -1,6 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import beginnerImg from "@/assets/beginner-class.jpg";
 import intermediateImg from "@/assets/intermediate-class.jpg";
+import advancedImg from "@/assets/advanced-class.jpg";
 
 const classes = [
   {
@@ -30,7 +31,7 @@ const classes = [
   },
   {
     level: "Advanced Class",
-    image: null,
+    image: advancedImg,
     description: "Tingkat mahir untuk peningkatan skill profesional atau persiapan lomba/pameran.",
     topics: [],
     gradient: "gradient-blue"
