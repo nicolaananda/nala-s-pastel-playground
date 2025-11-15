@@ -1,5 +1,9 @@
-import cloudBg from "@/assets/cloud-background.jpg";
-import nalaLogo from "@/assets/nala-logo.png";
+// @ts-ignore - vite-imagetools handles this
+import cloudBg from "@/assets/cloud-background.jpg?w=1920&format=webp";
+import cloudBgFallback from "@/assets/cloud-background.jpg";
+// @ts-ignore - vite-imagetools handles this
+import nalaLogo from "@/assets/nala-logo.png?w=896&format=webp";
+import nalaLogoFallback from "@/assets/nala-logo.png";
 
 const Hero = () => {
   return (
@@ -15,7 +19,19 @@ const Hero = () => {
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
         }}
-      />
+      >
+        <picture>
+          <source srcSet={cloudBg} type="image/webp" />
+          <img 
+            src={cloudBgFallback} 
+            alt="" 
+            className="absolute inset-0 w-full h-full object-cover opacity-0"
+            loading="eager"
+            fetchPriority="high"
+            aria-hidden="true"
+          />
+        </picture>
+      </div>
       
       {/* Fun overlay gradient - sangat transparan agar background terlihat jelas */}
       <div className="absolute inset-0 z-[1] bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
@@ -35,11 +51,18 @@ const Hero = () => {
       <div className="relative z-10 container mx-auto px-4 sm:px-6 text-center">
         {/* Logo with fun animations */}
         <div className="mb-6 sm:mb-8 animate-bounce-in">
-          <img 
-            src={nalaLogo} 
-            alt="Nala Art Studio Logo" 
-            className="w-64 sm:w-80 md:w-96 lg:w-[28rem] mx-auto drop-shadow-2xl animate-float"
-          />
+          <picture>
+            <source srcSet={nalaLogo} type="image/webp" />
+            <img 
+              src={nalaLogoFallback} 
+              alt="Nala Art Studio Logo" 
+              className="w-64 sm:w-80 md:w-96 lg:w-[28rem] mx-auto drop-shadow-2xl animate-float"
+              loading="eager"
+              fetchPriority="high"
+              width="448"
+              height="448"
+            />
+          </picture>
         </div>
 
         {/* Title with sparkle effect */}

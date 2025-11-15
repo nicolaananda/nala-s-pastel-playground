@@ -1,12 +1,19 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import beginnerImg from "@/assets/beginner-class.jpg";
-import intermediateImg from "@/assets/intermediate-class.jpg";
-import advancedImg from "@/assets/advanced-class.jpg";
+// @ts-ignore - vite-imagetools handles this
+import beginnerImg from "@/assets/beginner-class.jpg?w=800&format=webp";
+import beginnerImgFallback from "@/assets/beginner-class.jpg";
+// @ts-ignore - vite-imagetools handles this
+import intermediateImg from "@/assets/intermediate-class.jpg?w=800&format=webp";
+import intermediateImgFallback from "@/assets/intermediate-class.jpg";
+// @ts-ignore - vite-imagetools handles this
+import advancedImg from "@/assets/advanced-class.jpg?w=800&format=webp";
+import advancedImgFallback from "@/assets/advanced-class.jpg";
 
 const classes = [
   {
     level: "Beginner Class",
     image: beginnerImg,
+    imageFallback: beginnerImgFallback,
     description: "Cocok untuk usia mulai dari 4 tahun.",
     topics: [
       "Mewarnai Oil Pastel",
@@ -20,6 +27,7 @@ const classes = [
   {
     level: "Intermediate Class",
     image: intermediateImg,
+    imageFallback: intermediateImgFallback,
     description: "Level lanjutan dari Beginner Class.",
     topics: [
       "Watercolor Class",
@@ -32,6 +40,7 @@ const classes = [
   {
     level: "Advanced Class",
     image: advancedImg,
+    imageFallback: advancedImgFallback,
     description: "Tingkat mahir untuk peningkatan skill profesional atau persiapan lomba/pameran.",
     topics: [],
     gradient: "gradient-blue"
@@ -60,11 +69,18 @@ const ArtClasses = () => {
             >
               {artClass.image ? (
                 <div className="h-40 sm:h-48 overflow-hidden">
-                  <img 
-                    src={artClass.image} 
-                    alt={artClass.level}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
+                  <picture>
+                    <source srcSet={artClass.image} type="image/webp" />
+                    <img 
+                      src={artClass.imageFallback || artClass.image} 
+                      alt={artClass.level}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      loading="lazy"
+                      decoding="async"
+                      width="400"
+                      height="192"
+                    />
+                  </picture>
                 </div>
               ) : (
                 <div className={`h-40 sm:h-48 ${artClass.gradient} group-hover:scale-110 transition-transform duration-500`} />

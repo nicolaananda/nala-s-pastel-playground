@@ -1,58 +1,10 @@
-# Welcome to your Lovable project
+# Nala Art Studio
 
-## Project info
+Website resmi Nala Art Studio - Art Therapy untuk Anak & Dewasa.
 
-**URL**: https://lovable.dev/projects/14418a50-7428-4ce6-b5c6-75dff18daa30
+## Teknologi yang Digunakan
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/14418a50-7428-4ce6-b5c6-75dff18daa30) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
+Proyek ini dibangun dengan:
 
 - Vite
 - TypeScript
@@ -60,14 +12,73 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
+## Cara Menjalankan Proyek Lokal
 
-Simply open [Lovable](https://lovable.dev/projects/14418a50-7428-4ce6-b5c6-75dff18daa30) and click on Share -> Publish.
+### Prasyarat
 
-## Can I connect a custom domain to my Lovable project?
+- Node.js & npm terinstall - [install dengan nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Yes, you can!
+### Langkah-langkah
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```sh
+# Step 1: Clone repository
+git clone <YOUR_GIT_URL>
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# Step 2: Masuk ke direktori proyek
+cd nalav2
+
+# Step 3: Install dependencies
+npm install
+
+# Step 4: Jalankan development server
+npm run dev
+```
+
+Aplikasi akan berjalan di `http://localhost:8080`
+
+## Build untuk Production
+
+```sh
+# Build aplikasi
+npm run build
+
+# Preview build
+npm run preview
+```
+
+## Deploy dengan Docker
+
+```sh
+# Build dan jalankan dengan Docker Compose
+docker-compose up --build -d
+
+# Aplikasi akan berjalan di port 6612
+# Akses di: http://localhost:6612
+```
+
+## Struktur Proyek
+
+```
+nalav2/
+├── src/
+│   ├── components/     # Komponen React
+│   ├── pages/          # Halaman aplikasi
+│   ├── assets/         # Gambar dan aset
+│   └── ...
+├── public/             # File statis
+├── Dockerfile          # Konfigurasi Docker
+├── docker-compose.yml  # Docker Compose config
+└── nginx.conf          # Konfigurasi Nginx
+```
+
+## Fitur
+
+- ✅ Mobile-friendly dan responsive
+- ✅ Animasi interaktif untuk anak-anak
+- ✅ Optimized untuk performance
+- ✅ SEO-friendly
+- ✅ Docker support untuk deployment
+
+## Kontak
+
+- Instagram: [@nala_art_studio](https://instagram.com/nala_art_studio)
