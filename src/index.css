@@ -8,60 +8,52 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Pastel Yellow Theme */
-    --background: 0 0% 100%;
-    --foreground: 45 15% 25%;
+    /* Fun Yellow Theme for Kids */
+    --background: 48 100% 98%;
+    --foreground: 45 20% 20%;
 
     --card: 0 0% 100%;
-    --card-foreground: 45 15% 25%;
+    --card-foreground: 45 20% 20%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 45 15% 25%;
+    --popover-foreground: 45 20% 20%;
 
-    /* Soft Yellow Primary */
-    --primary: 48 100% 85%;
-    --primary-foreground: 45 15% 25%;
+    /* Bright Yellow Primary */
+    --primary: 45 100% 65%;
+    --primary-foreground: 0 0% 100%;
     
-    /* Light Yellow Secondary */
-    --secondary: 52 100% 90%;
-    --secondary-foreground: 45 15% 25%;
+    /* Soft Orange Secondary */
+    --secondary: 35 100% 75%;
+    --secondary-foreground: 45 20% 20%;
 
-    /* Soft Pastels */
-    --muted: 48 100% 93%;
-    --muted-foreground: 45 15% 50%;
+    /* Fun Pastels */
+    --muted: 48 100% 90%;
+    --muted-foreground: 45 20% 45%;
 
-    --accent: 52 100% 95%;
-    --accent-foreground: 45 15% 25%;
+    --accent: 55 100% 80%;
+    --accent-foreground: 45 20% 20%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 48 50% 90%;
-    --input: 48 50% 90%;
-    --ring: 48 100% 85%;
+    --border: 45 80% 85%;
+    --input: 45 80% 90%;
+    --ring: 45 100% 65%;
 
-    --radius: 1rem;
+    --radius: 1.5rem;
     
-    /* Gradients */
-    --gradient-pink-blue: linear-gradient(135deg, hsl(48 100% 85%), hsl(52 100% 90%));
-    --gradient-pink: linear-gradient(135deg, hsl(48 100% 85%), hsl(48 100% 93%));
-    --gradient-blue: linear-gradient(135deg, hsl(52 100% 90%), hsl(52 100% 95%));
+    /* Fun Gradients */
+    --gradient-pink-blue: linear-gradient(135deg, hsl(45 100% 65%), hsl(35 100% 75%), hsl(25 100% 80%));
+    --gradient-pink: linear-gradient(135deg, hsl(45 100% 70%), hsl(48 100% 85%));
+    --gradient-blue: linear-gradient(135deg, hsl(35 100% 75%), hsl(40 100% 85%));
     
-    /* Shadows */
-    --shadow-soft: 0 4px 20px hsla(48, 100%, 85%, 0.15);
-    --shadow-hover: 0 8px 30px hsla(48, 100%, 85%, 0.25);
+    /* Playful Shadows */
+    --shadow-soft: 0 8px 24px hsla(45, 100%, 65%, 0.2);
+    --shadow-hover: 0 12px 40px hsla(45, 100%, 65%, 0.35);
     
-    /* Transitions */
+    /* Smooth Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
 
   .dark {
@@ -136,5 +128,39 @@ All colors MUST be HSL.
   
   .transition-smooth {
     transition: var(--transition-smooth);
+  }
+  
+  .transition-bounce {
+    transition: var(--transition-bounce);
+  }
+  
+  /* Fun decorative elements */
+  .sparkle {
+    position: relative;
+  }
+  
+  .sparkle::before,
+  .sparkle::after {
+    content: '✨';
+    position: absolute;
+    font-size: 1.5rem;
+    animation: sparkle 2s ease-in-out infinite;
+  }
+  
+  .sparkle::before {
+    top: -1rem;
+    left: -1rem;
+    animation-delay: 0s;
+  }
+  
+  .sparkle::after {
+    bottom: -1rem;
+    right: -1rem;
+    animation-delay: 1s;
+  }
+  
+  @keyframes sparkle {
+    0%, 100% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+    50% { opacity: 1; transform: scale(1) rotate(180deg); }
   }
 }

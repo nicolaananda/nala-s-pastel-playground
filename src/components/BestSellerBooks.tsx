@@ -1,6 +1,4 @@
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ExternalLink } from "lucide-react";
 
 const books = [
   {
@@ -25,14 +23,14 @@ const books = [
 
 const BestSellerBooks = () => {
   return (
-    <section id="buku-best-seller" className="py-20 px-4 bg-gradient-to-b from-accent/30 to-background">
+    <section id="buku-best-seller" className="py-20 px-4 bg-gradient-to-br from-background via-muted/30 to-accent/20">
       <div className="container mx-auto max-w-6xl">
         <div className="text-center mb-16 animate-fade-in">
-          <h2 className="text-4xl md:text-5xl font-bold mb-4 text-foreground">
+          <h2 className="text-4xl md:text-5xl font-bold mb-4 text-foreground sparkle">
             📚 3 Buku Best Seller
           </h2>
-          <p className="text-2xl md:text-3xl font-semibold bg-gradient-pink-blue bg-clip-text text-transparent">
-            Seri Juara 1 Lomba Mewarnai
+          <p className="text-xl md:text-2xl text-primary font-semibold">
+            Seri "Juara 1 Lomba Mewarnai" 🏆
           </p>
         </div>
         
@@ -40,26 +38,29 @@ const BestSellerBooks = () => {
           {books.map((book, index) => (
             <Card 
               key={index}
-              className="border-2 border-border rounded-3xl shadow-soft hover:shadow-hover transition-smooth hover:scale-105 animate-scale-in overflow-hidden"
-              style={{ animationDelay: `${index * 0.1}s` }}
+              className="border-4 border-primary/30 rounded-3xl shadow-hover hover:shadow-soft transition-bounce hover:scale-105 hover:-rotate-2 animate-bounce-in bg-gradient-to-br from-card to-accent/10"
+              style={{ animationDelay: `${index * 0.15}s` }}
             >
-              <div className={`h-4 ${book.gradient}`} />
-              <CardHeader className="space-y-4">
-                <CardTitle className="text-xl font-bold text-foreground leading-tight">
+              <div className={`h-8 ${book.gradient} rounded-t-3xl`} />
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold text-foreground">
                   {book.title}
                 </CardTitle>
-                <CardDescription className="text-base text-muted-foreground leading-relaxed">
+                <CardDescription className="text-base text-muted-foreground">
                   {book.description}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <Button 
-                  className="w-full rounded-full bg-primary hover:bg-primary/90 text-foreground shadow-soft hover:shadow-hover transition-smooth group"
-                  onClick={() => window.open(book.link, '_blank')}
+              
+              <CardContent className="pt-6">
+                <a 
+                  href={book.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <span>Beli Sekarang</span>
-                  <ExternalLink className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
+                  <button className="w-full px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-full shadow-hover hover:shadow-soft transition-bounce hover:scale-110 border-3 border-foreground/10">
+                    🛒 Beli Sekarang
+                  </button>
+                </a>
               </CardContent>
             </Card>
           ))}
