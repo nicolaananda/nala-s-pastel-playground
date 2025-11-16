@@ -53,25 +53,31 @@ PageSpeed Insights melaporkan 2 masalah optimasi image:
 import intermediateImg from "@/assets/intermediate-class.jpg?w=800&format=webp&quality=70";
 ```
 
-**Sesudah:**
+**Sesudah (Iterasi 1):**
 ```tsx
 import intermediateImg from "@/assets/intermediate-class.jpg?w=400&format=webp&quality=80";
 ```
 
+**Sesudah (Iterasi 2 - Final):**
+```tsx
+import intermediateImg from "@/assets/intermediate-class.jpg?w=400&format=webp&quality=70";
+```
+
 **Perubahan:**
 - Mengurangi width dari 800px ke 400px (sesuai dengan container)
-- Meningkatkan quality dari 70% ke 80% (lebih baik untuk kualitas visual)
+- Quality: 70% → 80% → 70% (optimal balance antara kualitas visual dan ukuran file)
 - Diterapkan untuk semua class images (beginner, intermediate, advanced)
 - Menambahkan `sizes` attribute untuk responsive images
+- Quality 70% untuk WebP masih memberikan kualitas visual yang baik dengan ukuran file yang lebih kecil
 
 ## 📊 Expected Results
 
 Setelah perbaikan:
 - ✅ Nala Logo: Browser akan memilih 448px untuk default, 896px hanya untuk high-DPI
 - ✅ Est Savings: ~41.5 KiB untuk logo
-- ✅ Class Images: Ukuran lebih kecil (~50% reduction)
-- ✅ Est Savings: ~16 KiB untuk intermediate class
-- ✅ Total Est Savings: ~57.5 KiB
+- ✅ Class Images: Ukuran lebih kecil (~50% reduction dari width, ~30-50% dari quality)
+- ✅ Est Savings: ~28 KiB untuk semua class images (Intermediate: 15.7 KiB, Advanced: 7.1 KiB, Beginner: 5.2 KiB)
+- ✅ Total Est Savings: ~69.5 KiB (logo + class images)
 - ✅ PageSpeed score meningkat
 - ✅ LCP (Largest Contentful Paint) lebih cepat
 
@@ -88,9 +94,13 @@ Image akan di-generate ulang dengan ukuran dan quality yang baru.
 ## 📝 Catatan Penting
 
 1. **Responsive Images**: `sizes` attribute memberitahu browser ukuran image di berbagai viewport, sehingga browser bisa memilih image yang tepat
-2. **Quality vs Size**: Quality 75-80% sudah cukup untuk WebP format dengan kualitas visual yang baik
+2. **Quality vs Size**: 
+   - Quality 70% untuk WebP masih memberikan kualitas visual yang baik dengan ukuran file yang lebih kecil
+   - Quality 75% untuk logo 2x (retina) masih bagus untuk high-DPI screens
+   - Quality 80% untuk logo 1x untuk kualitas yang lebih baik karena logo adalah elemen penting
 3. **Width Descriptor**: Menggunakan `w` (width) lebih baik daripada `x` (pixel density) karena lebih akurat untuk responsive design
-4. **Future Optimization**: Bisa ditambahkan lebih banyak breakpoints jika perlu (misalnya untuk mobile landscape, tablet portrait, dll)
+4. **Compression Factor**: PageSpeed Insights menyarankan untuk meningkatkan compression factor (menurunkan quality) jika masih ada ruang optimasi
+5. **Future Optimization**: Bisa ditambahkan lebih banyak breakpoints jika perlu (misalnya untuk mobile landscape, tablet portrait, dll)
 
 ## 🧪 Testing
 
