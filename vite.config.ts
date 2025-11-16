@@ -42,8 +42,8 @@ export default defineConfig({
     chunkSizeWarningLimit: 1000,
     // Source maps for production (optional, set to false for smaller builds)
     sourcemap: false,
-    // CSS code splitting
-    cssCodeSplit: true,
+    // CSS code splitting - false for faster initial render
+    cssCodeSplit: false,
     // Reduce bundle size
     reportCompressedSize: false,
   },

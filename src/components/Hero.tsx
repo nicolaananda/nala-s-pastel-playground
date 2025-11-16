@@ -84,8 +84,7 @@ const Hero = () => {
 
         {/* Introduction with fun background */}
         <div 
-          className="max-w-4xl mx-auto mb-6 sm:mb-10 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-card/95 backdrop-blur-sm shadow-hover border-2 sm:border-4 border-primary/30 animate-scale-in"
-          style={{ animationDelay: '0.2s' }}
+          className="max-w-4xl mx-auto mb-6 sm:mb-10 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-card/95 backdrop-blur-sm shadow-hover border-2 sm:border-4 border-primary/30"
         >
           <p className="text-sm sm:text-base md:text-lg lg:text-xl text-foreground leading-relaxed whitespace-pre-line font-medium">
             {`Hi, nama ku Nala 👋 Aku adalah seorang guru, penulis, dan content creator. 
