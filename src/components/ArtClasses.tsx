@@ -1,12 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 // @ts-ignore - vite-imagetools handles this
-import beginnerImg from "@/assets/beginner-class.jpg?w=400&format=webp&quality=70";
+import beginnerImg from "@/assets/beginner-class.jpg?w=400&format=webp&quality=65";
 import beginnerImgFallback from "@/assets/beginner-class.jpg";
 // @ts-ignore - vite-imagetools handles this
-import intermediateImg from "@/assets/intermediate-class.jpg?w=400&format=webp&quality=70";
+import intermediateImg from "@/assets/intermediate-class.jpg?w=400&format=webp&quality=60";
 import intermediateImgFallback from "@/assets/intermediate-class.jpg";
 // @ts-ignore - vite-imagetools handles this
-import advancedImg from "@/assets/advanced-class.jpg?w=400&format=webp&quality=70";
+import advancedImg from "@/assets/advanced-class.jpg?w=400&format=webp&quality=65";
 import advancedImgFallback from "@/assets/advanced-class.jpg";
 
 const classes = [
