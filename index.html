@@ -14,19 +14,20 @@
     <meta name="author" content="Nala Art Studio" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <link rel="canonical" href="https://artstudionala.com/" />
-    <!-- Preconnect to own domain for faster asset loading -->
+    
+    <!-- Preconnect to own domain FIRST (critical for parallel resource loading) -->
     <link rel="preconnect" href="https://artstudionala.com" crossorigin>
     <link rel="dns-prefetch" href="https://artstudionala.com">
     
-    <!-- Preconnect to Google Fonts -->
+    <!-- Preconnect to Google Fonts (defer font loading to reduce critical path) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
-    <!-- Load fonts with font-display: swap for faster rendering -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Defer font loading to reduce critical path latency -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
     
-    <!-- Preload critical resources for faster LCP -->
-    <!-- Note: Actual file paths will be injected by Vite during build -->
+    <!-- Note: Vite will automatically inject preload/modulepreload links for CSS and JS during build -->
 
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
