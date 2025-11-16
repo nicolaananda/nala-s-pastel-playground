@@ -29,29 +29,13 @@ export default defineConfig({
   build: {
     // Optimize build output
     minify: 'esbuild', // Faster than terser
-    // Code splitting - manual chunks for better optimization
+    // Code splitting - let Vite handle automatically
     rollupOptions: {
       output: {
         // Optimize chunk file names
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
-        // Manual chunk splitting for better tree shaking
-        manualChunks: (id) => {
-          // Vendor chunks
-          if (id.includes('node_modules')) {
-            // React core
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'vendor-react';
-            }
-            // Radix UI components (large library)
-            if (id.includes('@radix-ui')) {
-              return 'vendor-radix';
-            }
-            // Other vendor libraries
-            return 'vendor';
-          }
-        },
       },
     },
     // Chunk size warning limit
@@ -62,15 +46,9 @@ export default defineConfig({
     cssCodeSplit: true,
     // Reduce bundle size
     reportCompressedSize: false,
-    // Tree shaking
-    treeshake: {
-      moduleSideEffects: false,
-    },
   },
   // Optimize dependencies
   optimizeDeps: {
     include: ['react', 'react-dom', 'react-router-dom'],
-    // Exclude unused dependencies from pre-bundling
-    exclude: ['@tanstack/react-query'],
   },
 });
