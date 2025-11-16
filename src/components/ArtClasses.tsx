@@ -1,12 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 // @ts-ignore - vite-imagetools handles this
-import beginnerImg from "@/assets/beginner-class.jpg?w=800&format=webp&quality=75";
+import beginnerImg from "@/assets/beginner-class.jpg?w=400&format=webp&quality=80";
 import beginnerImgFallback from "@/assets/beginner-class.jpg";
 // @ts-ignore - vite-imagetools handles this
-import intermediateImg from "@/assets/intermediate-class.jpg?w=800&format=webp&quality=70";
+import intermediateImg from "@/assets/intermediate-class.jpg?w=400&format=webp&quality=80";
 import intermediateImgFallback from "@/assets/intermediate-class.jpg";
 // @ts-ignore - vite-imagetools handles this
-import advancedImg from "@/assets/advanced-class.jpg?w=800&format=webp&quality=75";
+import advancedImg from "@/assets/advanced-class.jpg?w=400&format=webp&quality=80";
 import advancedImgFallback from "@/assets/advanced-class.jpg";
 
 const classes = [
@@ -70,7 +70,11 @@ const ArtClasses = () => {
               {artClass.image ? (
                 <div className="h-40 sm:h-48 overflow-hidden">
                   <picture>
-                    <source srcSet={artClass.image} type="image/webp" />
+                    <source 
+                      srcSet={artClass.image} 
+                      type="image/webp"
+                      sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+                    />
                     <img 
                       src={artClass.imageFallback || artClass.image} 
                       alt={artClass.level}
@@ -79,6 +83,7 @@ const ArtClasses = () => {
                       decoding="async"
                       width="400"
                       height="192"
+                      sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                     />
                   </picture>
                 </div>

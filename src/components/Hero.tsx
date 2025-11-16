@@ -2,9 +2,9 @@
 import cloudBg from "@/assets/cloud-background.jpg?w=1920&format=webp&quality=80";
 import cloudBgFallback from "@/assets/cloud-background.jpg";
 // @ts-ignore - vite-imagetools handles this
-import nalaLogo from "@/assets/nala-logo.png?w=448&format=webp&quality=85";
+import nalaLogo from "@/assets/nala-logo.png?w=448&format=webp&quality=80";
 // @ts-ignore - vite-imagetools handles this
-import nalaLogo2x from "@/assets/nala-logo.png?w=896&format=webp&quality=85";
+import nalaLogo2x from "@/assets/nala-logo.png?w=896&format=webp&quality=75";
 import nalaLogoFallback from "@/assets/nala-logo.png";
 
 const Hero = () => {
@@ -55,7 +55,8 @@ const Hero = () => {
         <div className="mb-6 sm:mb-8 animate-bounce-in">
           <picture>
             <source 
-              srcSet={`${nalaLogo} 1x, ${nalaLogo2x} 2x`} 
+              srcSet={`${nalaLogo} 448w, ${nalaLogo2x} 896w`}
+              sizes="(max-width: 640px) 256px, (max-width: 768px) 320px, (max-width: 1024px) 384px, 448px"
               type="image/webp" 
             />
             <img 
@@ -66,6 +67,7 @@ const Hero = () => {
               fetchPriority="high"
               width="448"
               height="448"
+              sizes="(max-width: 640px) 256px, (max-width: 768px) 320px, (max-width: 1024px) 384px, 448px"
             />
           </picture>
         </div>
