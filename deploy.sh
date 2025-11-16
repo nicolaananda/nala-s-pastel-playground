@@ -5,7 +5,6 @@ echo "📥 Pulling latest code..."
 git pull
 
 echo "🏗️ Building project..."
-npm install
 npm run build
 
 echo "🚚 Copying build to web root..."

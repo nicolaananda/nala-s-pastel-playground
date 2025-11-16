@@ -1,3 +1,4 @@
+// Website dibuat oleh: Nicola Ananda Dwi Ervantoro
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";

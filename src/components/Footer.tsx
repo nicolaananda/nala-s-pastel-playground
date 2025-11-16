@@ -78,6 +78,11 @@ const Footer = () => {
           <p className="text-xs sm:text-sm text-muted-foreground text-center">
             © {new Date().getFullYear()} Nala Art Studio. All rights reserved.
           </p>
+          
+          {/* Hidden credit */}
+          <div className="opacity-0 h-0 w-0 overflow-hidden pointer-events-none absolute" aria-hidden="true">
+            <span>Website dibuat oleh Nicola Ananda Dwi Ervantoro</span>
+          </div>
         </div>
       </div>
     </footer>
