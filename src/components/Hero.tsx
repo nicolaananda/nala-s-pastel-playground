@@ -119,6 +119,11 @@ seri "Juara 1 Lomba Mewarnai".`}
               <span className="inline-block group-hover:animate-bounce">📚</span> Beli Buku Best Seller
             </button>
           </a>
+          <a href="/berita-lomba" className="w-full sm:w-auto group">
+            <button className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-500 bg-[length:200%_100%] hover:bg-[position:100%_0] text-white font-bold text-base sm:text-lg rounded-full shadow-hover hover:shadow-soft transition-all duration-500 hover:scale-110 active:scale-95 border-2 sm:border-4 border-foreground/10 touch-manipulation hover:animate-wiggle">
+              <span className="inline-block group-hover:animate-bounce">🏆</span> Berita Lomba
+            </button>
+          </a>
         </div>
       </div>
     </section>
