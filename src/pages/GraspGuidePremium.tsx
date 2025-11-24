@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import GuideImage from "@/assets/Guide.png";
 import Image1 from "@/assets/Image1.jpeg";
 import Image2 from "@/assets/Image2.jpeg";
@@ -20,6 +21,7 @@ const premiumAssets = [
 const GraspGuidePremium = () => {
   const navigate = useNavigate();
   const [savedCode, setSavedCode] = useState<string | null>(null);
+  const [previewAsset, setPreviewAsset] = useState<(typeof premiumAssets)[number] | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -80,13 +82,36 @@ const GraspGuidePremium = () => {
 
         <div className="grid gap-6 md:grid-cols-2">
           {premiumAssets.map((asset) => (
-            <figure key={asset.title} className="rounded-3xl border border-border bg-card shadow-soft overflow-hidden">
+            <figure
+              key={asset.title}
+              className="rounded-3xl border border-border bg-card shadow-soft overflow-hidden cursor-zoom-in transition hover:shadow-hover"
+              onClick={() => setPreviewAsset(asset)}
+            >
               <img src={asset.src} alt={asset.title} className="w-full h-auto object-cover" loading="lazy" />
               <figcaption className="p-4 text-center font-semibold text-foreground">{asset.title}</figcaption>
             </figure>
           ))}
         </div>
       </div>
+
+      <Dialog open={!!previewAsset} onOpenChange={(open) => !open && setPreviewAsset(null)}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{previewAsset?.title ?? "Pratinjau Gambar"}</DialogTitle>
+            <DialogDescription>Gunakan gerakan pinch atau scroll untuk memperbesar detail.</DialogDescription>
+          </DialogHeader>
+          {previewAsset && (
+            <div className="w-full">
+              <img
+                src={previewAsset.src}
+                alt={previewAsset.title}
+                className="w-full h-full max-h-[80vh] object-contain rounded-2xl"
+                loading="lazy"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 };
