@@ -3,7 +3,7 @@ set -e
 
 echo "📥 Pulling latest code..."
 git pull
-
+npm run build
 echo "🏗️ Building project..."
 sudo mv /dist /var/www/artstudionala.com
 
