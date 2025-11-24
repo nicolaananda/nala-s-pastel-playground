@@ -5,7 +5,8 @@ echo "📥 Pulling latest code..."
 git pull
 npm run build
 echo "🏗️ Building project..."
-sudo mv /dist /var/www/artstudionala.com
+sudo rm -rf /var/www/artstudionala.com      # hapus semuanya yang lama
+sudo mv ./dist /var/www/artstudionala.com
 
 sudo chown -R www-data:www-data /var/www/artstudionala.com
 sudo chmod -R 755 /var/www/artstudionala.com
