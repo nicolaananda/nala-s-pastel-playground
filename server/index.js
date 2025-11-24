@@ -3,16 +3,47 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import midtransClient from 'midtrans-client';
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATABASE_PATH = path.join(__dirname, 'database.json');
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Ensure database file exists with default structure
+if (!fs.existsSync(DATABASE_PATH)) {
+  fs.writeFileSync(
+    DATABASE_PATH,
+    JSON.stringify({ graspGuideAccess: [] }, null, 2),
+    'utf-8'
+  );
+}
+
+const readDatabase = async () => {
+  const file = await fs.promises.readFile(DATABASE_PATH, 'utf-8');
+  return JSON.parse(file);
+};
+
+const writeDatabase = async (data) => {
+  await fs.promises.writeFile(
+    DATABASE_PATH,
+    JSON.stringify(data, null, 2),
+    'utf-8'
+  );
+};
+
+const normalizeCode = (code = '') =>
+  code.trim().toUpperCase();
 
 // Initialize Midtrans Snap
 const snap = new midtransClient.Snap({
@@ -51,6 +82,86 @@ app.post('/api/midtrans/create-payment-link', async (req, res) => {
     res.status(500).json({ 
       message: error.message || 'Failed to create payment link',
       error: error.ApiResponse || error.message 
+    });
+  }
+});
+
+// Persist Grasp Guide access codes
+app.post('/api/grasp-guide/access-code', async (req, res) => {
+  try {
+    const { transactionId, orderId, code, customer } = req.body;
+
+    if (!transactionId || !orderId || !code) {
+      return res.status(400).json({
+        message: 'transactionId, orderId, and code are required',
+      });
+    }
+
+    const database = await readDatabase();
+    database.graspGuideAccess = database.graspGuideAccess || [];
+
+    const record = {
+      transactionId,
+      orderId,
+      code: normalizeCode(code),
+      customer,
+      savedAt: new Date().toISOString(),
+    };
+
+    const existingIndex = database.graspGuideAccess.findIndex(
+      (entry) => entry.transactionId === transactionId
+    );
+
+    if (existingIndex >= 0) {
+      database.graspGuideAccess[existingIndex] = record;
+    } else {
+      database.graspGuideAccess.push(record);
+    }
+
+    await writeDatabase(database);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Save access code error:', error);
+    res.status(500).json({
+      message: 'Failed to save access code',
+      error: error.message,
+    });
+  }
+});
+
+app.post('/api/grasp-guide/verify-code', async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({
+        message: 'code is required',
+      });
+    }
+
+    const database = await readDatabase();
+    const normalized = normalizeCode(code);
+    const record = database.graspGuideAccess?.find(
+      (entry) => entry.code === normalized
+    );
+
+    if (!record) {
+      return res.status(404).json({
+        valid: false,
+        message: 'Kode tidak ditemukan',
+      });
+    }
+
+    res.json({
+      valid: true,
+      record,
+    });
+  } catch (error) {
+    console.error('Verify access code error:', error);
+    res.status(500).json({
+      message: 'Failed to verify access code',
+      error: error.message,
     });
   }
 });

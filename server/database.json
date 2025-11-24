@@ -1,0 +1,17 @@
+{
+  "graspGuideAccess": [
+    {
+      "transactionId": "manual-GG-77CRL8",
+      "orderId": "manual-entry",
+      "code": "GG-77CRL8",
+      "customer": {
+        "firstName": "Nicola",
+        "lastName": "Ananda",
+        "email": "gmail@nicola.id",
+        "phone": "+6281389592985"
+      },
+      "savedAt": "2025-11-24T14:45:00.000Z"
+    }
+  ]
+}
+

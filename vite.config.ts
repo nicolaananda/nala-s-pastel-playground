@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, splitVendorChunkPlugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { imagetools } from "vite-imagetools";
@@ -10,13 +10,14 @@ export default defineConfig({
     port: 8080,
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:8723',
         changeOrigin: true,
       },
     },
   },
   plugins: [
     react(),
+    splitVendorChunkPlugin(),
     imagetools({
       defaultDirectives: (url) => {
         // Convert to WebP by default for better compression
@@ -42,6 +43,13 @@ export default defineConfig({
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
+        manualChunks(id) {
+          // Only isolate the heavy Grasp Guide page; let Rollup decide other vendor chunks to avoid circular deps.
+          if (id.includes('src/pages/GraspGuide')) {
+            return 'grasp-guide';
+          }
+          return undefined;
+        },
       },
     },
     // Chunk size warning limit
@@ -49,7 +57,7 @@ export default defineConfig({
     // Source maps for production (optional, set to false for smaller builds)
     sourcemap: false,
     // CSS code splitting - false for faster initial render
-    cssCodeSplit: false,
+    cssCodeSplit: true,
     // Reduce bundle size
     reportCompressedSize: false,
   },

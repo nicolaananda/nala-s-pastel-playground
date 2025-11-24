@@ -93,8 +93,12 @@ export const createMidtransPaymentLink = async (
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to create payment link' }));
-      throw new Error(error.message || 'Failed to create payment link');
+      const error = await response.json().catch(async () => {
+        const fallbackText = await response.text().catch(() => '');
+        return { message: fallbackText || 'Failed to create payment link' };
+      });
+      const detailedMessage = error.error?.message || error.message || 'Failed to create payment link';
+      throw new Error(detailedMessage);
     }
 
     const data = await response.json();
@@ -162,8 +166,12 @@ export const createMidtransClassPaymentLink = async (
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Failed to create payment link' }));
-      throw new Error(error.message || 'Failed to create payment link');
+      const error = await response.json().catch(async () => {
+        const fallbackText = await response.text().catch(() => '');
+        return { message: fallbackText || 'Failed to create payment link' };
+      });
+      const detailedMessage = error.error?.message || error.message || 'Failed to create payment link';
+      throw new Error(detailedMessage);
     }
 
     const data = await response.json();
@@ -177,5 +185,76 @@ export const createMidtransClassPaymentLink = async (
     console.error('Midtrans class payment link creation error:', error);
     throw error;
   }
+};
+
+export interface SaveAccessCodeRequest {
+  transactionId: string;
+  orderId: string;
+  code: string;
+  customer: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
+}
+
+export const saveGraspGuideAccessCode = async (payload: SaveAccessCodeRequest) => {
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+  const apiUrl = `${baseUrl}/api/grasp-guide/access-code`;
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(async () => {
+      const fallbackText = await response.text().catch(() => '');
+      return { message: fallbackText || 'Failed to save access code' };
+    });
+    throw new Error(error.message || 'Failed to save access code');
+  }
+
+  return response.json();
+};
+
+export interface VerifyAccessCodeResponse {
+  valid: boolean;
+  record?: {
+    transactionId: string;
+    orderId: string;
+    code: string;
+    customer?: SaveAccessCodeRequest['customer'];
+  };
+  message?: string;
+}
+
+export const verifyGraspGuideAccessCode = async (
+  code: string
+): Promise<VerifyAccessCodeResponse> => {
+  const baseUrl = import.meta.env.VITE_API_URL || '';
+  const apiUrl = `${baseUrl}/api/grasp-guide/verify-code`;
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ code }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(async () => {
+      const fallbackText = await response.text().catch(() => '');
+      return { message: fallbackText || 'Failed to verify code' };
+    });
+    throw new Error(error.message || 'Failed to verify code');
+  }
+
+  return response.json();
 };
 
