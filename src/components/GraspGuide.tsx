@@ -138,6 +138,7 @@ const GraspGuide = () => {
 
       if (paymentResponse.token && window.snap) {
         closeSnapPopup();
+        setIsDialogOpen(false);
         window.snap.pay(paymentResponse.token, {
           onSuccess: (result: SnapResult) => {
             closeSnapPopup();
@@ -158,6 +159,7 @@ const GraspGuide = () => {
           },
         });
       } else if (paymentResponse.paymentUrl) {
+        setIsDialogOpen(false);
         window.location.href = paymentResponse.paymentUrl;
         toast("Mengalihkan ke halaman pembayaran Midtrans.");
       } else {
