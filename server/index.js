@@ -288,6 +288,106 @@ function getFallbackShippingCost(courier) {
   };
 }
 
+// Midtrans Notification Webhook
+app.post('/api/midtrans/notification', async (req, res) => {
+  try {
+    const notification = req.body;
+    
+    // Verify signature key (optional but recommended)
+    // const signatureKey = notification.signature_key;
+    // const calculatedSignature = sha512(notification.order_id + notification.status_code + notification.gross_amount + process.env.MIDTRANS_SERVER_KEY);
+    // if (signatureKey !== calculatedSignature) return res.status(403).json({ message: 'Invalid signature' });
+
+    const transactionStatus = notification.transaction_status;
+    const fraudStatus = notification.fraud_status;
+    const orderId = notification.order_id;
+    const transactionId = notification.transaction_id;
+
+    console.log(`Received notification for order ${orderId}: ${transactionStatus}`);
+
+    if (transactionStatus == 'capture') {
+      if (fraudStatus == 'challenge') {
+        // TODO: Handle challenge
+      } else if (fraudStatus == 'accept') {
+        await handleSuccessTransaction(orderId, transactionId, notification);
+      }
+    } else if (transactionStatus == 'settlement') {
+      await handleSuccessTransaction(orderId, transactionId, notification);
+    } else if (
+      transactionStatus == 'cancel' ||
+      transactionStatus == 'deny' ||
+      transactionStatus == 'expire'
+    ) {
+      // TODO: Handle failure
+    } else if (transactionStatus == 'pending') {
+      // TODO: Handle pending
+    }
+
+    res.status(200).json({ status: 'OK' });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(500).json({ message: 'Webhook failed', error: error.message });
+  }
+});
+
+const handleSuccessTransaction = async (orderId, transactionId, notification) => {
+  const database = await readDatabase();
+  database.graspGuideAccess = database.graspGuideAccess || [];
+
+  // Check if code already exists for this transaction
+  const existingRecord = database.graspGuideAccess.find(
+    (entry) => entry.orderId === orderId || entry.transactionId === transactionId
+  );
+
+  if (existingRecord) {
+    console.log(`Code already exists for order ${orderId}`);
+    return;
+  }
+
+  // Generate new code
+  const randomPart = Math.random().toString(36).slice(-6).toUpperCase();
+  const code = `GG-${randomPart}`;
+
+  const record = {
+    transactionId,
+    orderId,
+    code: normalizeCode(code),
+    customer: {
+        email: notification.email || '', 
+    },
+    savedAt: new Date().toISOString(),
+    source: 'webhook'
+  };
+
+  database.graspGuideAccess.push(record);
+  await writeDatabase(database);
+  console.log(`Generated code ${code} for order ${orderId}`);
+};
+
+// Get Code by Order ID (for client polling)
+app.get('/api/transaction/:orderId/code', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const database = await readDatabase();
+    
+    const record = database.graspGuideAccess?.find(
+      (entry) => entry.orderId === orderId
+    );
+
+    if (!record) {
+      return res.status(404).json({ message: 'Code not found or payment not yet settled' });
+    }
+
+    res.json({ 
+      code: record.code,
+      transactionId: record.transactionId
+    });
+  } catch (error) {
+    console.error('Get code error:', error);
+    res.status(500).json({ message: 'Failed to fetch code' });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);

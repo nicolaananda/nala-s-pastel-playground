@@ -65,10 +65,10 @@ const GraspGuide = () => {
     setFormData((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
-  const generateAccessCode = useCallback(() => {
-    const randomPart = Math.random().toString(36).slice(-6).toUpperCase();
-    return `GG-${randomPart}`;
-  }, []);
+  // const generateAccessCode = useCallback(() => {
+  //   const randomPart = Math.random().toString(36).slice(-6).toUpperCase();
+  //   return `GG-${randomPart}`;
+  // }, []);
 
   const handleOpenPayment = () => {
     setIsDialogOpen(true);
@@ -142,8 +142,42 @@ const GraspGuide = () => {
         window.snap.pay(paymentResponse.token, {
           onSuccess: (result: SnapResult) => {
             closeSnapPopup();
-            const code = generateAccessCode();
-            void handleSuccessfulUnlock(code, result);
+            // Instead of generating locally, we poll the server for the code
+            // The webhook should have triggered by now or will trigger soon
+            toast("Pembayaran berhasil! Sedang mengambil kode akses...");
+
+            // Poll for code
+            const pollForCode = async () => {
+              let attempts = 0;
+              const maxAttempts = 10; // 20 seconds total
+
+              const check = async () => {
+                try {
+                  const response = await fetch(`/api/transaction/${result.order_id}/code`);
+                  if (response.ok) {
+                    const data = await response.json();
+                    void handleSuccessfulUnlock(data.code, result);
+                    return true;
+                  }
+                } catch (e) {
+                  console.error("Error fetching code:", e);
+                }
+                return false;
+              };
+
+              const interval = setInterval(async () => {
+                attempts++;
+                const success = await check();
+                if (success || attempts >= maxAttempts) {
+                  clearInterval(interval);
+                  if (!success) {
+                    toast.error("Gagal mengambil kode otomatis. Silakan cek email atau hubungi admin.");
+                  }
+                }
+              }, 2000);
+            };
+
+            pollForCode();
           },
           onPending: () => {
             closeSnapPopup();

@@ -7,6 +7,7 @@ import GuideImage from "@/assets/Guide.png";
 import Image1 from "@/assets/Image1.jpeg";
 import Image2 from "@/assets/Image2.jpeg";
 import Image3 from "@/assets/Image3.jpeg";
+import Image4 from "@/assets/Image4.png";
 
 const ACCESS_CODE_KEY = "graspGuideAccessCode";
 const SESSION_UNLOCK_KEY = "graspGuideSessionAuthorized";
@@ -16,6 +17,7 @@ const premiumAssets = [
   { src: Image1, title: "Sheet Panduan 1" },
   { src: Image2, title: "Sheet Panduan 2" },
   { src: Image3, title: "Sheet Panduan 3" },
+  { src: Image4, title: "Sheet Panduan 4" },
 ];
 
 const GraspGuidePremium = () => {
@@ -80,6 +82,24 @@ const GraspGuidePremium = () => {
           </div>
         </div>
 
+
+
+        {/* YouTube Video Section */}
+        <div className="w-full max-w-3xl mx-auto">
+          <div className="relative pb-[56.25%] h-0 rounded-2xl overflow-hidden shadow-soft border border-border bg-card">
+            <iframe
+              className="absolute top-0 left-0 w-full h-full"
+              src="https://www.youtube.com/embed/U6GRQyS0fZU"
+              title="Grasp Panduan Nama & Nomor"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            ></iframe>
+          </div>
+          <p className="text-center text-sm text-muted-foreground mt-3">
+            Grasp Panduan Nama & Nomor #juara1lombamewarnai #mewarnai #lombamewarnai
+          </p>
+        </div>
+
         <div className="grid gap-6 md:grid-cols-2">
           {premiumAssets.map((asset) => (
             <figure
@@ -112,7 +132,7 @@ const GraspGuidePremium = () => {
           )}
         </DialogContent>
       </Dialog>
-    </main>
+    </main >
   );
 };
 
