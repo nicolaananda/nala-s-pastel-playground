@@ -11,6 +11,18 @@
         "phone": "+6281389592985"
       },
       "savedAt": "2025-11-24T14:45:00.000Z"
+    },
+    {
+      "transactionId": "manual-GG-N1KPJM",
+      "orderId": "manual-entry",
+      "code": "GG-N1KPJM",
+      "customer": {
+        "firstName": "New",
+        "lastName": "Customer",
+        "email": "new.customer@example.com",
+        "phone": "+1234567890"
+      },
+      "savedAt": "2024-01-01T00:00:00.000Z"
     }
   ]
 }
