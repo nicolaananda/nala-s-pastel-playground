@@ -62,7 +62,7 @@ app.post('/api/midtrans/create-payment-link', async (req, res) => {
   try {
     const parameter = {
       ...req.body,
-      enabled_payments: ["qris"]
+      enabled_payments: ["qris", "gopay", "other_qris"]
     };
 
     // Validate required fields
