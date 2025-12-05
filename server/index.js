@@ -60,7 +60,10 @@ app.get('/api/health', (req, res) => {
 // Midtrans Payment Link Endpoint
 app.post('/api/midtrans/create-payment-link', async (req, res) => {
   try {
-    const parameter = req.body;
+    const parameter = {
+      ...req.body,
+      enabled_payments: ["qris"]
+    };
 
     // Validate required fields
     if (!parameter.transaction_details || !parameter.customer_details) {
