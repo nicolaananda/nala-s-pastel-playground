@@ -69,14 +69,8 @@ app.post('/api/midtrans/create-payment-link', async (req, res) => {
       });
     }
 
-    // Enforce QRIS only
-    const transactionParams = {
-      ...parameter,
-      enabled_payments: ['qris']
-    };
-
     // Create transaction
-    const transaction = await snap.createTransaction(transactionParams);
+    const transaction = await snap.createTransaction(parameter);
 
     res.json({
       payment_url: transaction.redirect_url,
