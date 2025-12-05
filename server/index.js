@@ -64,13 +64,19 @@ app.post('/api/midtrans/create-payment-link', async (req, res) => {
 
     // Validate required fields
     if (!parameter.transaction_details || !parameter.customer_details) {
-      return res.status(400).json({ 
-        message: 'Missing required fields: transaction_details and customer_details' 
+      return res.status(400).json({
+        message: 'Missing required fields: transaction_details and customer_details'
       });
     }
 
+    // Enforce QRIS only
+    const transactionParams = {
+      ...parameter,
+      enabled_payments: ['qris']
+    };
+
     // Create transaction
-    const transaction = await snap.createTransaction(parameter);
+    const transaction = await snap.createTransaction(transactionParams);
 
     res.json({
       payment_url: transaction.redirect_url,
@@ -79,9 +85,9 @@ app.post('/api/midtrans/create-payment-link', async (req, res) => {
     });
   } catch (error) {
     console.error('Midtrans error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       message: error.message || 'Failed to create payment link',
-      error: error.ApiResponse || error.message 
+      error: error.ApiResponse || error.message
     });
   }
 });
@@ -173,8 +179,8 @@ app.post('/api/shipping/calculate', async (req, res) => {
 
     // Validate required fields
     if (!origin || !destination || !weight || !courier) {
-      return res.status(400).json({ 
-        message: 'Missing required fields: origin, destination, weight, courier' 
+      return res.status(400).json({
+        message: 'Missing required fields: origin, destination, weight, courier'
       });
     }
 
@@ -215,7 +221,7 @@ app.post('/api/shipping/calculate', async (req, res) => {
     });
   } catch (error) {
     console.error('RajaOngkir error:', error.response?.data || error.message);
-    
+
     // Return fallback if API fails
     const fallback = getFallbackShippingCost(req.body.courier || 'jne');
     res.json(fallback);
@@ -233,8 +239,8 @@ app.get('/api/shipping/cities', async (req, res) => {
 
     // Check if RajaOngkir API key is set
     if (!process.env.RAJAONGKIR_API_KEY) {
-      return res.status(503).json({ 
-        message: 'RajaOngkir API key not configured' 
+      return res.status(503).json({
+        message: 'RajaOngkir API key not configured'
       });
     }
 
@@ -257,9 +263,9 @@ app.get('/api/shipping/cities', async (req, res) => {
     res.json(cities);
   } catch (error) {
     console.error('RajaOngkir cities error:', error.response?.data || error.message);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Failed to fetch cities',
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -292,7 +298,7 @@ function getFallbackShippingCost(courier) {
 app.post('/api/midtrans/notification', async (req, res) => {
   try {
     const notification = req.body;
-    
+
     // Verify signature key (optional but recommended)
     // const signatureKey = notification.signature_key;
     // const calculatedSignature = sha512(notification.order_id + notification.status_code + notification.gross_amount + process.env.MIDTRANS_SERVER_KEY);
@@ -353,7 +359,7 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
     orderId,
     code: normalizeCode(code),
     customer: {
-        email: notification.email || '', 
+      email: notification.email || '',
     },
     savedAt: new Date().toISOString(),
     source: 'webhook'
@@ -369,7 +375,7 @@ app.get('/api/transaction/:orderId/code', async (req, res) => {
   try {
     const { orderId } = req.params;
     const database = await readDatabase();
-    
+
     const record = database.graspGuideAccess?.find(
       (entry) => entry.orderId === orderId
     );
@@ -378,7 +384,7 @@ app.get('/api/transaction/:orderId/code', async (req, res) => {
       return res.status(404).json({ message: 'Code not found or payment not yet settled' });
     }
 
-    res.json({ 
+    res.json({
       code: record.code,
       transactionId: record.transactionId
     });
@@ -392,7 +398,7 @@ app.get('/api/transaction/:orderId/code', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`📝 Health check: http://localhost:${PORT}/api/health`);
-  
+
   // Check environment variables
   if (!process.env.MIDTRANS_SERVER_KEY) {
     console.warn('⚠️  MIDTRANS_SERVER_KEY not set - payment will not work');
