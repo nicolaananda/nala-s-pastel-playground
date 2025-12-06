@@ -17,7 +17,8 @@
     "migrate": "node server/migrate.js",
     "test:db": "node server/test-db.js",
     "test:webhook": "node server/test-webhook.js",
-    "test:insert": "node server/test-direct-db.js"
+    "test:insert": "node server/test-direct-db.js",
+    "generate:code": "node server/generate-missing-code.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
