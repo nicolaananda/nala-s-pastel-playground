@@ -24,7 +24,7 @@ declare global {
   }
 }
 
-const GUIDE_PRICE = 5000;
+const GUIDE_PRICE = 10;
 const ACCESS_CODE_KEY = "graspGuideAccessCode";
 const SESSION_UNLOCK_KEY = "graspGuideSessionAuthorized";
 
@@ -150,17 +150,62 @@ const GraspGuide = () => {
             const pollForCode = async () => {
               let attempts = 0;
               const maxAttempts = 10; // 20 seconds total
+              const baseUrl = import.meta.env.VITE_API_URL || '';
 
               const check = async () => {
                 try {
-                  const response = await fetch(`/api/transaction/${result.order_id}/code`);
+                  // Use baseUrl if set, otherwise use relative path (for dev proxy)
+                  const apiUrl = baseUrl 
+                    ? `${baseUrl}/api/transaction/${result.order_id}/code`
+                    : `/api/transaction/${result.order_id}/code`;
+                  
+                  console.log(`[Poll ${attempts + 1}/${maxAttempts}] Fetching code from:`, apiUrl);
+                  
+                  const response = await fetch(apiUrl, {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                  });
+
+                  console.log(`[Poll ${attempts + 1}] Response status:`, response.status);
+
                   if (response.ok) {
-                    const data = await response.json();
-                    void handleSuccessfulUnlock(data.code, result);
-                    return true;
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                      try {
+                        const data = await response.json();
+                        console.log(`[Poll ${attempts + 1}] Response data:`, data);
+                        if (data.code) {
+                          console.log(`✅ Code found: ${data.code}`);
+                          void handleSuccessfulUnlock(data.code, result);
+                          return true;
+                        } else {
+                          console.warn(`[Poll ${attempts + 1}] No code in response:`, data);
+                        }
+                      } catch (jsonError) {
+                        console.error(`[Poll ${attempts + 1}] JSON parse error:`, jsonError);
+                        const text = await response.text();
+                        console.error('Response text:', text);
+                      }
+                    } else {
+                      const text = await response.text();
+                      console.error(`[Poll ${attempts + 1}] Unexpected content-type:`, contentType);
+                      console.error('Response text:', text.substring(0, 200));
+                    }
+                  } else if (response.status === 404) {
+                    // Code not found yet, continue polling
+                    console.log(`[Poll ${attempts + 1}] Code not found yet (404), continuing...`);
+                    return false;
+                  } else {
+                    const errorText = await response.text().catch(() => 'Unknown error');
+                    console.error(`[Poll ${attempts + 1}] Error fetching code (${response.status}):`, errorText.substring(0, 200));
                   }
                 } catch (e) {
-                  console.error("Error fetching code:", e);
+                  console.error(`[Poll ${attempts + 1}] Network/fetch error:`, e);
+                  if (e instanceof TypeError && e.message.includes('Failed to fetch')) {
+                    console.error('Possible CORS issue or server not reachable. Check VITE_API_URL:', baseUrl || 'not set');
+                  }
                 }
                 return false;
               };

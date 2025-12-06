@@ -15,7 +15,9 @@
     "init:schema": "node server/init-schema.js",
     "verify:table": "node server/verify-table.js",
     "migrate": "node server/migrate.js",
-    "test:db": "node server/test-db.js"
+    "test:db": "node server/test-db.js",
+    "test:webhook": "node server/test-webhook.js",
+    "test:insert": "node server/test-direct-db.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

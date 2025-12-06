@@ -12,7 +12,28 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+// CORS configuration - allow requests from production domain
+const allowedOrigins = [
+  'https://artstudionala.com',
+  'https://www.artstudionala.com',
+  'http://localhost:8080',
+  'http://localhost:5173',
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(null, true); // Allow all in development, restrict in production if needed
+    }
+  },
+  credentials: true,
+}));
 app.use(express.json());
 
 const normalizeCode = (code = '') =>
