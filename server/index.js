@@ -3,44 +3,17 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import midtransClient from 'midtrans-client';
 import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { db, initDatabase } from './db.js';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const DATABASE_PATH = path.join(__dirname, 'database.json');
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Ensure database file exists with default structure
-if (!fs.existsSync(DATABASE_PATH)) {
-  fs.writeFileSync(
-    DATABASE_PATH,
-    JSON.stringify({ graspGuideAccess: [] }, null, 2),
-    'utf-8'
-  );
-}
-
-const readDatabase = async () => {
-  const file = await fs.promises.readFile(DATABASE_PATH, 'utf-8');
-  return JSON.parse(file);
-};
-
-const writeDatabase = async (data) => {
-  await fs.promises.writeFile(
-    DATABASE_PATH,
-    JSON.stringify(data, null, 2),
-    'utf-8'
-  );
-};
 
 const normalizeCode = (code = '') =>
   code.trim().toUpperCase();
@@ -100,28 +73,13 @@ app.post('/api/grasp-guide/access-code', async (req, res) => {
       });
     }
 
-    const database = await readDatabase();
-    database.graspGuideAccess = database.graspGuideAccess || [];
-
-    const record = {
+    await db.saveAccessCode({
       transactionId,
       orderId,
       code: normalizeCode(code),
       customer,
-      savedAt: new Date().toISOString(),
-    };
-
-    const existingIndex = database.graspGuideAccess.findIndex(
-      (entry) => entry.transactionId === transactionId
-    );
-
-    if (existingIndex >= 0) {
-      database.graspGuideAccess[existingIndex] = record;
-    } else {
-      database.graspGuideAccess.push(record);
-    }
-
-    await writeDatabase(database);
+      source: 'manual',
+    });
 
     res.json({ success: true });
   } catch (error) {
@@ -143,18 +101,17 @@ app.post('/api/grasp-guide/verify-code', async (req, res) => {
       });
     }
 
-    const database = await readDatabase();
     const normalized = normalizeCode(code);
-    const record = database.graspGuideAccess?.find(
-      (entry) => entry.code === normalized
-    );
+    const row = await db.findCodeByCode(normalized);
 
-    if (!record) {
+    if (!row) {
       return res.status(404).json({
         valid: false,
         message: 'Kode tidak ditemukan',
       });
     }
+
+    const record = db.rowToJson(row);
 
     res.json({
       valid: true,
@@ -334,56 +291,53 @@ app.post('/api/midtrans/notification', async (req, res) => {
 });
 
 const handleSuccessTransaction = async (orderId, transactionId, notification) => {
-  const database = await readDatabase();
-  database.graspGuideAccess = database.graspGuideAccess || [];
+  try {
+    // Check if code already exists for this transaction
+    const existingByOrder = await db.findCodeByOrderId(orderId);
+    const existingByTransaction = transactionId ? await db.findCodeByTransactionId(transactionId) : null;
 
-  // Check if code already exists for this transaction
-  const existingRecord = database.graspGuideAccess.find(
-    (entry) => entry.orderId === orderId || entry.transactionId === transactionId
-  );
+    if (existingByOrder || existingByTransaction) {
+      console.log(`Code already exists for order ${orderId}`);
+      return;
+    }
 
-  if (existingRecord) {
-    console.log(`Code already exists for order ${orderId}`);
-    return;
+    // Generate new code
+    const randomPart = Math.random().toString(36).slice(-6).toUpperCase();
+    const code = `GG-${randomPart}`;
+
+    await db.saveAccessCode({
+      transactionId,
+      orderId,
+      code: normalizeCode(code),
+      customer: {
+        email: notification.customer_details?.email || notification.email || '',
+        firstName: notification.customer_details?.first_name || '',
+        lastName: notification.customer_details?.last_name || '',
+        phone: notification.customer_details?.phone || '',
+      },
+      source: 'webhook',
+    });
+
+    console.log(`✅ Generated code ${code} for order ${orderId}`);
+  } catch (error) {
+    console.error(`❌ Error handling success transaction for order ${orderId}:`, error);
+    throw error;
   }
-
-  // Generate new code
-  const randomPart = Math.random().toString(36).slice(-6).toUpperCase();
-  const code = `GG-${randomPart}`;
-
-  const record = {
-    transactionId,
-    orderId,
-    code: normalizeCode(code),
-    customer: {
-      email: notification.email || '',
-    },
-    savedAt: new Date().toISOString(),
-    source: 'webhook'
-  };
-
-  database.graspGuideAccess.push(record);
-  await writeDatabase(database);
-  console.log(`Generated code ${code} for order ${orderId}`);
 };
 
 // Get Code by Order ID (for client polling)
 app.get('/api/transaction/:orderId/code', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const database = await readDatabase();
+    const row = await db.findCodeByOrderId(orderId);
 
-    const record = database.graspGuideAccess?.find(
-      (entry) => entry.orderId === orderId
-    );
-
-    if (!record) {
+    if (!row) {
       return res.status(404).json({ message: 'Code not found or payment not yet settled' });
     }
 
     res.json({
-      code: record.code,
-      transactionId: record.transactionId
+      code: row.code,
+      transactionId: row.transaction_id
     });
   } catch (error) {
     console.error('Get code error:', error);
@@ -391,17 +345,89 @@ app.get('/api/transaction/:orderId/code', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 API Server running on http://localhost:${PORT}`);
-  console.log(`📝 Health check: http://localhost:${PORT}/api/health`);
+// Generate missing code for a transaction (manual fix for missing codes)
+app.post('/api/transaction/:orderId/generate-code', async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { transactionId, customer } = req.body;
 
-  // Check environment variables
-  if (!process.env.MIDTRANS_SERVER_KEY) {
-    console.warn('⚠️  MIDTRANS_SERVER_KEY not set - payment will not work');
-  }
-  if (!process.env.RAJAONGKIR_API_KEY) {
-    console.warn('⚠️  RAJAONGKIR_API_KEY not set - using fallback shipping costs');
+    // Check if code already exists
+    const existing = await db.findCodeByOrderId(orderId);
+    if (existing) {
+      return res.json({
+        success: true,
+        message: 'Code already exists',
+        code: existing.code,
+        record: db.rowToJson(existing),
+      });
+    }
+
+    // Generate new code
+    const randomPart = Math.random().toString(36).slice(-6).toUpperCase();
+    const code = `GG-${randomPart}`;
+
+    const row = await db.saveAccessCode({
+      transactionId: transactionId || `manual-${orderId}`,
+      orderId,
+      code: normalizeCode(code),
+      customer: customer || {},
+      source: 'manual-fix',
+    });
+
+    console.log(`✅ Manually generated code ${code} for order ${orderId}`);
+
+    res.json({
+      success: true,
+      message: 'Code generated successfully',
+      code: row.code,
+      record: db.rowToJson(row),
+    });
+  } catch (error) {
+    console.error('Generate code error:', error);
+    res.status(500).json({
+      message: 'Failed to generate code',
+      error: error.message,
+    });
   }
 });
+
+// List all transactions (for debugging/admin)
+app.get('/api/admin/transactions', async (req, res) => {
+  try {
+    const rows = await db.getAllAccessCodes();
+    const records = rows.map(row => db.rowToJson(row));
+    res.json({ transactions: records, count: records.length });
+  } catch (error) {
+    console.error('Get transactions error:', error);
+    res.status(500).json({ message: 'Failed to fetch transactions', error: error.message });
+  }
+});
+
+// Initialize database and start server
+const startServer = async () => {
+  try {
+    // Initialize database connection and schema
+    await initDatabase();
+    console.log('✅ Database initialized');
+
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`🚀 API Server running on http://localhost:${PORT}`);
+      console.log(`📝 Health check: http://localhost:${PORT}/api/health`);
+
+      // Check environment variables
+      if (!process.env.MIDTRANS_SERVER_KEY) {
+        console.warn('⚠️  MIDTRANS_SERVER_KEY not set - payment will not work');
+      }
+      if (!process.env.RAJAONGKIR_API_KEY) {
+        console.warn('⚠️  RAJAONGKIR_API_KEY not set - using fallback shipping costs');
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 
