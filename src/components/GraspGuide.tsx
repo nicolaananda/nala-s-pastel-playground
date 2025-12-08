@@ -24,7 +24,7 @@ declare global {
   }
 }
 
-const GUIDE_PRICE = 10;
+const GUIDE_PRICE = 5000;
 const ACCESS_CODE_KEY = "graspGuideAccessCode";
 const SESSION_UNLOCK_KEY = "graspGuideSessionAuthorized";
 
