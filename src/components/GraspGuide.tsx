@@ -155,12 +155,12 @@ const GraspGuide = () => {
               const check = async () => {
                 try {
                   // Use baseUrl if set, otherwise use relative path (for dev proxy)
-                  const apiUrl = baseUrl 
+                  const apiUrl = baseUrl
                     ? `${baseUrl}/api/transaction/${result.order_id}/code`
                     : `/api/transaction/${result.order_id}/code`;
-                  
+
                   console.log(`[Poll ${attempts + 1}/${maxAttempts}] Fetching code from:`, apiUrl);
-                  
+
                   const response = await fetch(apiUrl, {
                     method: 'GET',
                     headers: {
@@ -267,11 +267,22 @@ const GraspGuide = () => {
         return;
       }
 
-      window.localStorage.setItem(ACCESS_CODE_KEY, codeToCheck);
-      window.sessionStorage.setItem(SESSION_UNLOCK_KEY, "true");
+      // Determine which premium page to navigate to based on code prefix
+      let premiumPage = "/grasp-guide-premium";
+      let storageKey = ACCESS_CODE_KEY;
+      let sessionKey = SESSION_UNLOCK_KEY;
+
+      if (codeToCheck.startsWith("SK-")) {
+        premiumPage = "/sketch-premium";
+        storageKey = "sketchAccessCode";
+        sessionKey = "sketchSessionAuthorized";
+      }
+
+      window.localStorage.setItem(storageKey, codeToCheck);
+      window.sessionStorage.setItem(sessionKey, "true");
       setStoredCode(codeToCheck);
       toast.success("Kode valid! Membuka halaman premium.");
-      navigate("/grasp-guide-premium");
+      navigate(premiumPage);
     } catch (error) {
       console.error("Verify access code error:", error);
       toast.error(error instanceof Error ? error.message : "Gagal memeriksa kode akses.");
@@ -281,71 +292,69 @@ const GraspGuide = () => {
   };
 
   return (
-    <section className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 bg-background">
-      <div className="container mx-auto max-w-2xl animate-fade-in">
-        <Card className="border-2 border-border rounded-2xl sm:rounded-3xl shadow-soft hover:shadow-hover transition-smooth overflow-hidden">
-          <div className="h-3 sm:h-4 gradient-pink-blue" />
-          <CardHeader className="text-center p-4 sm:p-6">
-            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">🧸 Panduan Nama Grasp</h2>
-            <CardDescription className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-              Bayar sekali untuk akses panduan nomor & warna Grasp plus kode eksklusif menuju halaman premium.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 p-4 sm:p-6 pt-0">
-            <div className="bg-gradient-pink-blue rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center">
-              <p className="text-sm uppercase tracking-[0.2em] font-semibold text-muted text-primary-foreground/80">
-                Investasi Sekali, Akses Selamanya
-              </p>
-              <p className="text-3xl sm:text-4xl font-bold text-foreground mt-2">Rp {GUIDE_PRICE.toLocaleString("id-ID")}</p>
-            </div>
-
-            <Button
-              size="lg"
-              onClick={handleOpenPayment}
-              className="w-full rounded-full text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 bg-gradient-to-r from-primary via-yellow-400 to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] text-foreground shadow-soft hover:shadow-hover transition-all duration-500 hover:scale-105 active:scale-95 group touch-manipulation"
-            >
-              <ShieldCheck className="mr-2 w-5 h-5" />
-              Bayar Sekarang
-            </Button>
-            <p className="text-xs text-muted-foreground text-center">
-              Tombol akan membuka form singkat lalu meneruskan pembayaran ke Midtrans.
+    <div className="animate-fade-in">
+      <Card className="border-2 border-border rounded-2xl sm:rounded-3xl shadow-soft hover:shadow-hover transition-smooth overflow-hidden">
+        <div className="h-3 sm:h-4 gradient-pink-blue" />
+        <CardHeader className="text-center p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">🧸 Panduan Nama Grasp</h2>
+          <CardDescription className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+            Bayar sekali untuk akses panduan nomor & warna Grasp plus kode eksklusif menuju halaman premium.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6 p-4 sm:p-6 pt-0">
+          <div className="bg-gradient-pink-blue rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center">
+            <p className="text-sm uppercase tracking-[0.2em] font-semibold text-muted text-primary-foreground/80">
+              Investasi Sekali, Akses Selamanya
             </p>
+            <p className="text-3xl sm:text-4xl font-bold text-foreground mt-2">Rp {GUIDE_PRICE.toLocaleString("id-ID")}</p>
+          </div>
 
-            <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <LockKeyhole className="h-5 w-5 text-primary" />
-                <p className="font-semibold text-foreground">Masukkan kode akses</p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Input
-                  placeholder="Contoh: GG-ABC123"
-                  value={enteredCode}
-                  onChange={(event) => setEnteredCode(event.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="sm:w-40"
-                  onClick={handleUnlockContent}
-                  disabled={isVerifyingCode}
-                >
-                  {isVerifyingCode ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Memeriksa...
-                    </>
-                  ) : (
-                    "Buka Konten"
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Sudah pernah membeli? Masukkan kode lama (bisa dari device mana pun) untuk pindah ke halaman premium.
-              </p>
+          <Button
+            size="lg"
+            onClick={handleOpenPayment}
+            className="w-full rounded-full text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 bg-gradient-to-r from-primary via-yellow-400 to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] text-foreground shadow-soft hover:shadow-hover transition-all duration-500 hover:scale-105 active:scale-95 group touch-manipulation"
+          >
+            <ShieldCheck className="mr-2 w-5 h-5" />
+            Bayar Sekarang
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Tombol akan membuka form singkat lalu meneruskan pembayaran ke Midtrans.
+          </p>
+
+          <div className="rounded-2xl border border-border bg-muted/20 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <LockKeyhole className="h-5 w-5 text-primary" />
+              <p className="font-semibold text-foreground">Masukkan kode akses</p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Input
+                placeholder="Contoh: GG-ABC123 atau SK-ABC123"
+                value={enteredCode}
+                onChange={(event) => setEnteredCode(event.target.value)}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                className="sm:w-40"
+                onClick={handleUnlockContent}
+                disabled={isVerifyingCode}
+              >
+                {isVerifyingCode ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memeriksa...
+                  </>
+                ) : (
+                  "Buka Konten"
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sudah pernah membeli? Masukkan kode lama (bisa dari device mana pun) untuk pindah ke halaman premium.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -399,7 +408,7 @@ const GraspGuide = () => {
           )}
         </DialogContent>
       </Dialog>
-    </section>
+    </div>
   );
 };
 

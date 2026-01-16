@@ -2,6 +2,7 @@ import { defineConfig, splitVendorChunkPlugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { imagetools } from "vite-imagetools";
+import { copyFileSync, existsSync } from "fs";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -27,6 +28,21 @@ export default defineConfig({
         return new URLSearchParams(url.searchParams);
       },
     }),
+    // Plugin untuk copy .htaccess ke dist setelah build
+    {
+      name: 'copy-htaccess',
+      closeBundle() {
+        const htaccessPath = path.resolve(__dirname, '.htaccess');
+        const distPath = path.resolve(__dirname, 'dist', '.htaccess');
+        
+        if (existsSync(htaccessPath)) {
+          copyFileSync(htaccessPath, distPath);
+          console.log('✅ Copied .htaccess to dist/');
+        } else {
+          console.warn('⚠️  .htaccess not found in root directory');
+        }
+      },
+    },
   ],
   resolve: {
     alias: {

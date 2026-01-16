@@ -17,14 +17,16 @@ const NALA_WEBHOOK_URL = 'https://api.artstudionala.com/api/midtrans/notificatio
  */
 function isNalaTransaction(orderId) {
   if (!orderId) return false;
-  
+
   // Pattern order_id untuk nala:
   // - CLASS-xxx untuk class registration
   // - GG-xxx untuk Grasp Guide
   // - GRASP-xxx untuk Grasp Guide (alternatif)
-  return orderId.includes('CLASS-') || 
-         orderId.includes('GG-') || 
-         orderId.includes('GRASP-');
+  // - SKET-xxx untuk Sketch purchase
+  return orderId.includes('CLASS-') ||
+    orderId.includes('GG-') ||
+    orderId.includes('GRASP-') ||
+    orderId.includes('SKET-');
 }
 
 /**
@@ -33,7 +35,7 @@ function isNalaTransaction(orderId) {
 async function forwardToNala(notification) {
   try {
     console.log(`[Webhook Forward] Forwarding to nala: ${notification.order_id}`);
-    
+
     const response = await axios.post(NALA_WEBHOOK_URL, notification, {
       headers: {
         'Content-Type': 'application/json',
@@ -88,6 +90,7 @@ module.exports = {
 
 // Atau jika ES6:
 // export { isNalaTransaction, forwardToNala };
+
 
 
 

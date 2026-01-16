@@ -2,6 +2,43 @@
 // Note: Payment link creation requires backend API for security
 // This service expects a backend endpoint at /api/midtrans/create-payment-link
 
+// Helper function to handle API errors with user-friendly messages
+const handlePaymentError = async (response: Response): Promise<never> => {
+  const error = await response.json().catch(async () => {
+    const fallbackText = await response.text().catch(() => '');
+    return { message: fallbackText || 'Failed to create payment link' };
+  });
+
+  // Extract detailed error message
+  const errorCode = error.error_code || 'UNKNOWN_ERROR';
+  const errorDetails = error.details?.join(', ') || '';
+  const detailedMessage = error.message || error.error?.message || 'Failed to create payment link';
+
+  // User-friendly error messages
+  let userMessage = detailedMessage;
+
+  if (errorCode === 'MIDTRANS_AUTH_FAILED' || response.status === 401) {
+    userMessage = 'Payment gateway authentication failed. Please try again later or contact support.';
+  } else if (errorCode === 'MIDTRANS_NOT_CONFIGURED') {
+    userMessage = 'Payment system is temporarily unavailable. Please contact support.';
+  } else if (errorCode === 'INVALID_REQUEST') {
+    userMessage = 'Invalid payment request. Please check your information and try again.';
+  } else if (response.status === 500) {
+    userMessage = 'Server error occurred. Please try again later.';
+  } else if (response.status >= 400 && response.status < 500) {
+    userMessage = 'Invalid request. Please check your information and try again.';
+  }
+
+  console.error('Payment creation failed:', {
+    status: response.status,
+    errorCode,
+    message: detailedMessage,
+    details: errorDetails
+  });
+
+  throw new Error(userMessage);
+};
+
 export interface MidtransPaymentRequest {
   bookId: string;
   bookTitle: string;
@@ -83,7 +120,7 @@ export const createMidtransPaymentLink = async (
     // In production, use VITE_API_URL environment variable
     const baseUrl = import.meta.env.VITE_API_URL || '';
     const apiUrl = `${baseUrl}/api/midtrans/create-payment-link`;
-    
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -93,16 +130,11 @@ export const createMidtransPaymentLink = async (
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(async () => {
-        const fallbackText = await response.text().catch(() => '');
-        return { message: fallbackText || 'Failed to create payment link' };
-      });
-      const detailedMessage = error.error?.message || error.message || 'Failed to create payment link';
-      throw new Error(detailedMessage);
+      await handlePaymentError(response);
     }
 
     const data = await response.json();
-    
+
     return {
       paymentUrl: data.payment_url || data.snap_url || data.redirect_url,
       orderId: data.order_id || requestBody.transaction_details.order_id,
@@ -156,7 +188,7 @@ export const createMidtransClassPaymentLink = async (
     // Call backend API endpoint
     const baseUrl = import.meta.env.VITE_API_URL || '';
     const apiUrl = `${baseUrl}/api/midtrans/create-payment-link`;
-    
+
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -166,16 +198,11 @@ export const createMidtransClassPaymentLink = async (
     });
 
     if (!response.ok) {
-      const error = await response.json().catch(async () => {
-        const fallbackText = await response.text().catch(() => '');
-        return { message: fallbackText || 'Failed to create payment link' };
-      });
-      const detailedMessage = error.error?.message || error.message || 'Failed to create payment link';
-      throw new Error(detailedMessage);
+      await handlePaymentError(response);
     }
 
     const data = await response.json();
-    
+
     return {
       paymentUrl: data.payment_url || data.snap_url || data.redirect_url,
       orderId: data.order_id || requestBody.transaction_details.order_id,
@@ -183,6 +210,74 @@ export const createMidtransClassPaymentLink = async (
     };
   } catch (error) {
     console.error('Midtrans class payment link creation error:', error);
+    throw error;
+  }
+};
+
+// Sketch Purchase Payment
+export interface MidtransSketchPaymentRequest {
+  sketchId: string;
+  sketchTitle: string;
+  price: number;
+  customerDetails: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+  };
+}
+
+export const createMidtransSketchPaymentLink = async (
+  request: MidtransSketchPaymentRequest
+): Promise<MidtransPaymentResponse> => {
+  // Prepare request body for backend API
+  const requestBody = {
+    transaction_details: {
+      order_id: `SKET-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      gross_amount: request.price,
+    },
+    item_details: [
+      {
+        id: request.sketchId,
+        price: request.price,
+        quantity: 1,
+        name: request.sketchTitle,
+      },
+    ],
+    customer_details: {
+      first_name: request.customerDetails.firstName,
+      last_name: request.customerDetails.lastName,
+      email: request.customerDetails.email,
+      phone: request.customerDetails.phone,
+    },
+  };
+
+  try {
+    // Call backend API endpoint
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const apiUrl = `${baseUrl}/api/midtrans/create-payment-link`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      await handlePaymentError(response);
+    }
+
+    const data = await response.json();
+
+    return {
+      paymentUrl: data.payment_url || data.snap_url || data.redirect_url,
+      orderId: data.order_id || requestBody.transaction_details.order_id,
+      token: data.token,
+    };
+  } catch (error) {
+    console.error('Midtrans sketch payment link creation error:', error);
     throw error;
   }
 };

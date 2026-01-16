@@ -24,7 +24,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
@@ -51,9 +51,49 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API is running' });
 });
 
+// Debug endpoint to check Midtrans configuration
+app.get('/api/midtrans/debug', (req, res) => {
+  const serverKey = process.env.MIDTRANS_SERVER_KEY;
+  const clientKey = process.env.MIDTRANS_CLIENT_KEY;
+  const isProduction = process.env.MIDTRANS_IS_PRODUCTION === 'true';
+
+  res.json({
+    configured: {
+      serverKey: !!serverKey,
+      clientKey: !!clientKey,
+      isProduction: !!process.env.MIDTRANS_IS_PRODUCTION
+    },
+    environment: isProduction ? 'production' : 'sandbox',
+    serverKeyPreview: serverKey ? `${serverKey.substring(0, 20)}...` : 'NOT SET',
+    serverKeyLength: serverKey ? serverKey.length : 0,
+    serverKeyFormat: serverKey ? (
+      serverKey.startsWith('SB-Mid-server-') ? 'sandbox' :
+        serverKey.startsWith('Mid-server-') ? 'production' :
+          'invalid'
+    ) : 'not configured',
+    warning: !serverKey || !clientKey ?
+      'Midtrans credentials are not properly configured' :
+      (isProduction && serverKey.startsWith('SB-Mid-server-')) ?
+        'Using sandbox key but IS_PRODUCTION is true' :
+        (!isProduction && serverKey.startsWith('Mid-server-') && !serverKey.startsWith('SB-Mid-server-')) ?
+          'Using production key but IS_PRODUCTION is false' :
+          null
+  });
+});
+
 // Midtrans Payment Link Endpoint
 app.post('/api/midtrans/create-payment-link', async (req, res) => {
   try {
+    // Check if Midtrans is configured
+    if (!process.env.MIDTRANS_SERVER_KEY) {
+      console.error('❌ MIDTRANS_SERVER_KEY is not configured');
+      return res.status(500).json({
+        success: false,
+        message: 'Payment gateway is not configured. Please contact administrator.',
+        error_code: 'MIDTRANS_NOT_CONFIGURED'
+      });
+    }
+
     const parameter = {
       ...req.body,
       enabled_payments: ["qris", "gopay", "other_qris"]
@@ -61,24 +101,56 @@ app.post('/api/midtrans/create-payment-link', async (req, res) => {
 
     // Validate required fields
     if (!parameter.transaction_details || !parameter.customer_details) {
+      console.warn('⚠️  Missing required fields in payment request');
       return res.status(400).json({
-        message: 'Missing required fields: transaction_details and customer_details'
+        success: false,
+        message: 'Missing required fields: transaction_details and customer_details',
+        error_code: 'INVALID_REQUEST'
       });
     }
+
+    // Log payment request (without sensitive data)
+    console.log('💳 Creating payment link:', {
+      order_id: parameter.transaction_details?.order_id,
+      amount: parameter.transaction_details?.gross_amount,
+      customer: parameter.customer_details?.email
+    });
 
     // Create transaction
     const transaction = await snap.createTransaction(parameter);
 
+    console.log('✅ Payment link created successfully:', transaction.token);
+
     res.json({
+      success: true,
       payment_url: transaction.redirect_url,
       order_id: parameter.transaction_details.order_id,
       token: transaction.token,
     });
   } catch (error) {
-    console.error('Midtrans error:', error);
+    // Enhanced error logging
+    console.error('❌ Midtrans API Error:', {
+      message: error.message,
+      httpStatusCode: error.httpStatusCode,
+      ApiResponse: error.ApiResponse
+    });
+
+    // Check for authentication error (401)
+    if (error.httpStatusCode === 401) {
+      return res.status(500).json({
+        success: false,
+        message: 'Payment gateway authentication failed. Please contact administrator.',
+        error_code: 'MIDTRANS_AUTH_FAILED',
+        details: error.ApiResponse?.error_messages || ['Invalid or expired API credentials']
+      });
+    }
+
+    // Return generic error for other cases
     res.status(500).json({
+      success: false,
       message: error.message || 'Failed to create payment link',
-      error: error.ApiResponse || error.message
+      error_code: 'MIDTRANS_ERROR',
+      details: error.ApiResponse?.error_messages || [error.message]
     });
   }
 });
@@ -322,9 +394,16 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
       return;
     }
 
-    // Generate new code
+    // Generate new code based on order type
     const randomPart = Math.random().toString(36).slice(-6).toUpperCase();
-    const code = `GG-${randomPart}`;
+    let code;
+
+    // Determine code prefix based on order ID
+    if (orderId.startsWith('SKET-')) {
+      code = `SK-${randomPart}`;
+    } else {
+      code = `GG-${randomPart}`;
+    }
 
     await db.saveAccessCode({
       transactionId,
