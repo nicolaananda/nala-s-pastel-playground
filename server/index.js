@@ -5,6 +5,7 @@ import midtransClient from 'midtrans-client';
 import axios from 'axios';
 import { db, initDatabase } from './db.js';
 import TelegramBot from 'node-telegram-bot-api';
+import nodemailer from 'nodemailer';
 
 // Load environment variables
 dotenv.config();
@@ -441,51 +442,78 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
 
     console.log(`✅ Generated/Saved code ${code} for order ${orderId}`);
 
-    // Send Telegram Notification for Classes
-    console.log(`🔍 Checking Telegram: isClass=${isClass}, hasBot=${!!telegramBot}`);
+    // Send Email Notification for Classes (Replaces Telegram)
+    console.log(`🔍 Checking Email: isClass=${isClass}`);
 
-    if (isClass && telegramBot) {
-      const chatId = process.env.TELEGRAM_CHAT_ID || '@noabsen13';
-      console.log(`📨 Preparing to send to Chat ID: ${chatId}`);
+    if (isClass) {
+      const emailRecipient = 'nicolaanandadwiervantoro@gmail.com';
+      console.log(`📧 Preparing to send email to: ${emailRecipient}`);
 
       const amount = parseFloat(notification.gross_amount).toLocaleString('id-ID');
-
       const customField1 = notification.custom_field1 || '-';
       const customField2 = notification.custom_field2 || '-';
       const customField3 = notification.custom_field3 || '-';
 
-      const message = `
-🎉 *Pembayaran Kelas Berhasil!*
+      const customerName = `${notification.customer_details?.first_name || ''} ${notification.customer_details?.last_name || ''}`;
+      const customerEmail = notification.customer_details?.email || '';
+      const customerPhone = notification.customer_details?.phone || '';
 
-🆔 Order ID: \`${orderId}\`
-💰 Nominal: Rp ${amount}
-
-📋 *Detail Pendaftaran*:
-${customField1}
-${customField2}
-${customField3}
-
-👤 *Pemesan*:
-Nama: ${notification.customer_details?.first_name || ''} ${notification.customer_details?.last_name || ''}
-Email: ${notification.customer_details?.email || ''}
-No HP: ${notification.customer_details?.phone || ''}
-
-✅ Status: LUNAS (${notification.transaction_status})
-      `.trim();
+      const emailSubject = `🎉 Pembayaran Kelas Berhasil: ${orderId}`;
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+          <div style="background-color: #4F46E5; padding: 20px; text-align: center;">
+            <h2 style="color: white; margin: 0;">🎉 Pembayaran Kelas Berhasil!</h2>
+          </div>
+          <div style="padding: 20px;">
+            <div style="background-color: #f9fafb; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #4F46E5;">
+              <p style="margin: 5px 0;"><strong>Order ID:</strong> ${orderId}</p>
+              <p style="margin: 5px 0;"><strong>Nominal:</strong> Rp ${amount}</p>
+              <p style="margin: 5px 0;"><strong>Status:</strong> <span style="color: green; font-weight: bold;">LUNAS</span></p>
+            </div>
+            <h3 style="color: #374151; border-bottom: 1px solid #eee; padding-bottom: 10px;">📋 Detail Pendaftaran</h3>
+            <ul style="color: #4B5563; line-height: 1.6;">
+              <li>${customField1}</li>
+              <li>${customField2}</li>
+              <li>${customField3}</li>
+            </ul>
+            <h3 style="color: #374151; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 25px;">👤 Data Pemesan</h3>
+            <p style="color: #4B5563; line-height: 1.6;">
+              <strong>Nama:</strong> ${customerName}<br>
+              <strong>Email:</strong> ${customerEmail}<br>
+              <strong>No HP:</strong> ${customerPhone}
+            </p>
+          </div>
+          <div style="background-color: #f3f4f6; padding: 15px; text-align: center; color: #6B7280; font-size: 12px;">
+            Email ini dikirim otomatis oleh Nala System.
+          </div>
+        </div>
+      `;
 
       try {
-        console.log('🚀 Sending Telegram message now...');
-        await telegramBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-        console.log(`✅ Telegram notification sent to ${chatId}`);
-      } catch (tgError) {
-        console.error('❌ Failed to send Telegram notification:', tgError.message);
-        if (tgError.response && tgError.response.body) {
-          console.error('❌ Telegram Response:', JSON.stringify(tgError.response.body));
-        }
+        const transporter = nodemailer.createTransport({
+          host: 'mail.nicola.id',
+          port: 465,
+          secure: true,
+          auth: {
+            user: 'gmail@nicola.id',
+            pass: '@Nandha20'
+          }
+        });
+
+        console.log('🚀 Sending Email now...');
+        const info = await transporter.sendMail({
+          from: '"Nala System" <gmail@nicola.id>',
+          to: emailRecipient,
+          subject: emailSubject,
+          html: emailHtml
+        });
+
+        console.log(`✅ Email notification sent: ${info.messageId}`);
+      } catch (emailError) {
+        console.error('❌ Failed to send Email notification:', emailError.message);
       }
     } else {
-      if (!telegramBot) console.warn('⚠️ Telegram bot instance is null (Check TELEGRAM_BOT_TOKEN)');
-      if (!isClass) console.log('ℹ️ Not a class transaction, skipping Telegram.');
+      if (!isClass) console.log('ℹ️ Not a class transaction, skipping Email.');
     }
 
   } catch (error) {
