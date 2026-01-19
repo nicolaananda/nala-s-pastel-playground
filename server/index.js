@@ -443,7 +443,7 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
 
     // Send Telegram Notification for Classes
     if (isClass && telegramBot) {
-      const chatId = '@noabsen13'; // Target chat/channel/user
+      const chatId = process.env.TELEGRAM_CHAT_ID || '@noabsen13'; // Target chat/channel/user
       const amount = parseFloat(notification.gross_amount).toLocaleString('id-ID');
 
       const customField1 = notification.custom_field1 || '-';
