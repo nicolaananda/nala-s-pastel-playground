@@ -1,10 +1,11 @@
 
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = process.argv[2] || 'http://localhost:3001';
 
 async function testTelegramNotification() {
     console.log('🚀 Testing Telegram Notification for Class Registration...');
+    console.log(`🎯 Target URL: ${API_URL}`);
 
     // Mock Midtrans Notification Payload
     // Transaction ID and Order ID must be unique-ish to ensure it processes
@@ -53,20 +54,35 @@ async function testTelegramNotification() {
         const data = response.data;
 
         console.log(`📥 Response Status: ${response.status}`);
+
+        // Check if response is HTML (Frontend) instead of JSON (Backend)
+        if (typeof data === 'string' && data.trim().startsWith('<!doctype html>')) {
+            console.error('\n❌ CRITICAL: Received HTML instead of JSON!');
+            console.error('👉 You are hitting the FRONTEND application, not the BACKEND API.');
+            console.error('👉 Please check which port your Backend Server (Express/Node) is running on.');
+            console.error(`👉 Try running: node test-telegram-class.js http://localhost:YOUR_BACKEND_PORT`);
+            return;
+        }
+
         console.log(`📄 Response Body:`, data);
 
         if (response.status === 200) {
-            console.log('✅ Webhook accepted!');
+            console.log('\n✅ Webhook accepted!');
             console.log('👀 Check the server logs to see if Telegram message was sent to @noabsen13');
         } else {
-            console.error('❌ Webhook failed or rejected.');
+            console.error('\n❌ Webhook failed or rejected.');
         }
 
     } catch (error) {
         if (error.code === 'ECONNREFUSED') {
-            console.error('❌ Could not connect to server. Is it running on port 3001?');
+            console.error(`\n❌ Could not connect to ${API_URL}`);
+            console.error('👉 Is the server running? Check port and try again.');
         } else {
-            console.error('❌ Error:', error.message);
+            console.error('\n❌ Error:', error.message);
+            if (error.response) {
+                console.error('Status:', error.response.status);
+                console.error('Data:', error.response.data);
+            }
         }
     }
 }
