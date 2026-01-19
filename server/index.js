@@ -442,8 +442,12 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
     console.log(`✅ Generated/Saved code ${code} for order ${orderId}`);
 
     // Send Telegram Notification for Classes
+    console.log(`🔍 Checking Telegram: isClass=${isClass}, hasBot=${!!telegramBot}`);
+
     if (isClass && telegramBot) {
-      const chatId = process.env.TELEGRAM_CHAT_ID || '@noabsen13'; // Target chat/channel/user
+      const chatId = process.env.TELEGRAM_CHAT_ID || '@noabsen13';
+      console.log(`📨 Preparing to send to Chat ID: ${chatId}`);
+
       const amount = parseFloat(notification.gross_amount).toLocaleString('id-ID');
 
       const customField1 = notification.custom_field1 || '-';
@@ -470,11 +474,18 @@ No HP: ${notification.customer_details?.phone || ''}
       `.trim();
 
       try {
+        console.log('🚀 Sending Telegram message now...');
         await telegramBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-        console.log(`📨 Telegram notification sent to ${chatId}`);
+        console.log(`✅ Telegram notification sent to ${chatId}`);
       } catch (tgError) {
         console.error('❌ Failed to send Telegram notification:', tgError.message);
+        if (tgError.response && tgError.response.body) {
+          console.error('❌ Telegram Response:', JSON.stringify(tgError.response.body));
+        }
       }
+    } else {
+      if (!telegramBot) console.warn('⚠️ Telegram bot instance is null (Check TELEGRAM_BOT_TOKEN)');
+      if (!isClass) console.log('ℹ️ Not a class transaction, skipping Telegram.');
     }
 
   } catch (error) {
