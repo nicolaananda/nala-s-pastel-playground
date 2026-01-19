@@ -10,59 +10,76 @@ import {
 } from "@/components/ui/dialog";
 import ClassRegistrationForm from "@/components/ClassRegistrationForm";
 // @ts-ignore - vite-imagetools handles this
-import beginnerImg from "@/assets/beginner-class.jpg?w=400&format=webp&quality=65";
-import beginnerImgFallback from "@/assets/beginner-class.jpg";
+import beginnerImg from "@/assets/begin.jpeg?w=400&format=webp&quality=65";
+import beginnerImgFallback from "@/assets/begin.jpeg";
 // @ts-ignore - vite-imagetools handles this
-import intermediateImg from "@/assets/intermediate-class.jpg?w=400&format=webp&quality=60";
-import intermediateImgFallback from "@/assets/intermediate-class.jpg";
+import beginnerDrawingImg from "@/assets/begsed.jpeg?w=400&format=webp&quality=65";
+import beginnerDrawingImgFallback from "@/assets/begsed.jpeg";
 // @ts-ignore - vite-imagetools handles this
-import advancedImg from "@/assets/advanced-class.jpg?w=400&format=webp&quality=65";
-import advancedImgFallback from "@/assets/advanced-class.jpg";
+import intermediateLandscapeImg from "@/assets/adlam.jpeg?w=400&format=webp&quality=60";
+import intermediateLandscapeImgFallback from "@/assets/adlam.jpeg";
+// @ts-ignore - vite-imagetools handles this
+import intermediateDrawingImg from "@/assets/interkolor.jpeg?w=400&format=webp&quality=65";
+import intermediateDrawingImgFallback from "@/assets/interkolor.jpeg";
+// @ts-ignore - vite-imagetools handles this
+import advancedImg from "@/assets/belajar gambar digital.jpeg?w=400&format=webp&quality=65";
+import advancedImgFallback from "@/assets/belajar gambar digital.jpeg";
 
 const classes = [
   {
-    id: "beginner-class",
-    level: "Beginner Class",
+    id: "beginner-coloring",
+    level: "Beginner Coloring",
     image: beginnerImg,
     imageFallback: beginnerImgFallback,
-    description: "Cocok untuk usia mulai dari 4 tahun.",
-    topics: [
-      "Mewarnai Oil Pastel",
-      "Menggambar & Mewarnai Sederhana",
-      "Melengkapi Gambar dan Mewarnai",
-      "Doodling Class",
-      "Anime Chibi Class"
-    ],
+    description: "Kelas mewarnai untuk pemula.",
+    topics: [],
     gradient: "gradient-pink",
-    price: 500000,
-    originalPrice: 750000,
+    price: 150000,
+    originalPrice: 0,
   },
   {
-    id: "intermediate-class",
-    level: "Intermediate Class",
-    image: intermediateImg,
-    imageFallback: intermediateImgFallback,
-    description: "Level lanjutan dari Beginner Class.",
-    topics: [
-      "Watercolor Class",
-      "Gouache Class",
-      "Realistic Drawing",
-      "Portrait Face Drawing"
-    ],
+    id: "beginner-drawing",
+    level: "Beginner Drawing Doodling",
+    image: beginnerDrawingImg,
+    imageFallback: beginnerDrawingImgFallback,
+    description: "Belajar menggambar dan doodling dasar.",
+    topics: [],
+    gradient: "gradient-pink",
+    price: 150000,
+    originalPrice: 0,
+  },
+  {
+    id: "intermediate-landscape",
+    level: "Intermediate Landscape",
+    image: intermediateLandscapeImg,
+    imageFallback: intermediateLandscapeImgFallback,
+    description: "Menggambar pemandangan tingkat menengah.",
+    topics: [],
     gradient: "gradient-pink-blue",
-    price: 750000,
-    originalPrice: 1000000,
+    price: 160000,
+    originalPrice: 0,
   },
   {
-    id: "advanced-class",
-    level: "Advanced Class",
+    id: "intermediate-drawing-coloring",
+    level: "Intermediate Drawing Coloring",
+    image: intermediateDrawingImg,
+    imageFallback: intermediateDrawingImgFallback,
+    description: "Teknik menggambar dan mewarnai tingkat lanjut.",
+    topics: [],
+    gradient: "gradient-pink-blue",
+    price: 160000,
+    originalPrice: 0,
+  },
+  {
+    id: "advanced-digital",
+    level: "Advanced Digital Art Class",
     image: advancedImg,
     imageFallback: advancedImgFallback,
-    description: "Tingkat mahir untuk peningkatan skill profesional atau persiapan lomba/pameran.",
+    description: "Kelas seni digital tingkat mahir.",
     topics: [],
     gradient: "gradient-blue",
-    price: 1000000,
-    originalPrice: 1500000,
+    price: 185000,
+    originalPrice: 0,
   }
 ];
 
@@ -91,10 +108,10 @@ const ArtClasses = () => {
             Pilih level sesuai kemampuanmu 🌟
           </p>
         </div>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {classes.map((artClass, index) => (
-            <Card 
+            <Card
               key={artClass.id}
               className="border-2 sm:border-4 border-primary/30 rounded-2xl sm:rounded-3xl shadow-hover hover:shadow-soft transition-all duration-300 hover:scale-105 hover:border-primary/60 animate-bounce-in overflow-hidden bg-white group"
               style={{ animationDelay: `${index * 0.15}s` }}
@@ -109,13 +126,13 @@ const ArtClasses = () => {
               {artClass.image ? (
                 <div className="h-48 sm:h-56 overflow-hidden bg-muted">
                   <picture>
-                    <source 
-                      srcSet={artClass.image} 
+                    <source
+                      srcSet={artClass.image}
                       type="image/webp"
                       sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                     />
-                    <img 
-                      src={artClass.imageFallback || artClass.image} 
+                    <img
+                      src={artClass.imageFallback || artClass.image}
                       alt={artClass.level}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       loading="lazy"
@@ -129,7 +146,7 @@ const ArtClasses = () => {
               ) : (
                 <div className={`h-48 sm:h-56 ${artClass.gradient} group-hover:scale-110 transition-transform duration-500`} />
               )}
-              
+
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-2">
                   {artClass.level}
@@ -152,7 +169,7 @@ const ArtClasses = () => {
                   </div>
                 </div>
               </CardHeader>
-              
+
               {artClass.topics.length > 0 && (
                 <CardContent className="p-4 sm:p-6 pt-0">
                   <p className="font-semibold text-sm sm:text-base text-foreground mb-2 sm:mb-3">Berisi:</p>

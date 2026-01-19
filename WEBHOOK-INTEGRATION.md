@@ -2,7 +2,7 @@
 
 ## Situasi Saat Ini
 
-- Webhook Midtrans sudah dikonfigurasi ke: `https://api.nicola.id/webhook/midtrans`
+- Webhook Midtrans sudah dikonfigurasi ke: `https://logs.nicola.id/webhook/midtrans`
 - Webhook diterima dengan sukses (200 OK)
 - Tapi kode tidak ter-generate karena handler bot-wa tidak memproses untuk nala
 
@@ -123,7 +123,7 @@ Midtrans **tidak support multiple webhook URLs** di satu account. Jadi tidak bis
 
 ```bash
 # Simulate webhook ke bot-wa
-curl -X POST https://api.nicola.id/webhook/midtrans \
+curl -X POST https://logs.nicola.id/webhook/midtrans \
   -H "Content-Type: application/json" \
   -d '{
     "transaction_status": "settlement",

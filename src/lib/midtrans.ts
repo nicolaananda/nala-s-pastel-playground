@@ -157,15 +157,26 @@ export interface MidtransClassPaymentRequest {
     email: string;
     phone: string;
   };
+  additionalDetails?: {
+    childName: string;
+    childDob: string;
+    parentWhatsapp: string;
+    domicileAddress: string;
+    socialMediaUsername: string;
+    classDay: string;
+  };
 }
 
 export const createMidtransClassPaymentLink = async (
   request: MidtransClassPaymentRequest
 ): Promise<MidtransPaymentResponse> => {
+  // Use BELAJAR- prefix as requested
+  const orderId = `BELAJAR-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
   // Prepare request body for backend API
   const requestBody = {
     transaction_details: {
-      order_id: `CLASS-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      order_id: orderId,
       gross_amount: request.price,
     },
     item_details: [
@@ -181,7 +192,20 @@ export const createMidtransClassPaymentLink = async (
       last_name: request.customerDetails.lastName,
       email: request.customerDetails.email,
       phone: request.customerDetails.phone,
+      billing_address: request.additionalDetails ? {
+        first_name: request.additionalDetails.childName, // Using child name in billing for easy ref
+        address: request.additionalDetails.domicileAddress,
+        phone: request.additionalDetails.parentWhatsapp,
+        country_code: 'IDN'
+      } : undefined
     },
+    // Using custom fields to pass extra data to Midtrans (and retrieve it in webhook)
+    custom_field1: request.additionalDetails ?
+      `Anak: ${request.additionalDetails.childName} (${request.additionalDetails.childDob})` : '',
+    custom_field2: request.additionalDetails ?
+      `IG: ${request.additionalDetails.socialMediaUsername} | WA: ${request.additionalDetails.parentWhatsapp}` : '',
+    custom_field3: request.additionalDetails ?
+      `Kelas: ${request.className} | Hari: ${request.additionalDetails.classDay}` : '',
   };
 
   try {

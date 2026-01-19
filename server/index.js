@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import midtransClient from 'midtrans-client';
 import axios from 'axios';
 import { db, initDatabase } from './db.js';
+import TelegramBot from 'node-telegram-bot-api';
 
 // Load environment variables
 dotenv.config();
@@ -383,6 +384,20 @@ app.post('/api/midtrans/notification', async (req, res) => {
   }
 });
 
+// Telegram Bot Configuration
+
+// Initialize Telegram Bot
+const initTelegramBot = () => {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) {
+    console.warn('⚠️ TELEGRAM_BOT_TOKEN not set - notifications will not be sent');
+    return null;
+  }
+  return new TelegramBot(token, { polling: false }); // No polling needed for sending
+};
+
+const telegramBot = initTelegramBot();
+
 const handleSuccessTransaction = async (orderId, transactionId, notification) => {
   try {
     // Check if code already exists for this transaction
@@ -397,10 +412,16 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
     // Generate new code based on order type
     const randomPart = Math.random().toString(36).slice(-6).toUpperCase();
     let code;
+    let isClass = false;
 
     // Determine code prefix based on order ID
     if (orderId.startsWith('SKET-')) {
       code = `SK-${randomPart}`;
+    } else if (orderId.startsWith('BELAJAR-')) {
+      // For classes, we use the Order ID itself as the code (or generate a specific one if needed)
+      // User wanted to track by BELAJAR- prefix.
+      code = orderId;
+      isClass = true;
     } else {
       code = `GG-${randomPart}`;
     }
@@ -418,7 +439,44 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
       source: 'webhook',
     });
 
-    console.log(`✅ Generated code ${code} for order ${orderId}`);
+    console.log(`✅ Generated/Saved code ${code} for order ${orderId}`);
+
+    // Send Telegram Notification for Classes
+    if (isClass && telegramBot) {
+      const chatId = '@noabsen13'; // Target chat/channel/user
+      const amount = parseFloat(notification.gross_amount).toLocaleString('id-ID');
+
+      const customField1 = notification.custom_field1 || '-';
+      const customField2 = notification.custom_field2 || '-';
+      const customField3 = notification.custom_field3 || '-';
+
+      const message = `
+🎉 *Pembayaran Kelas Berhasil!*
+
+🆔 Order ID: \`${orderId}\`
+💰 Nominal: Rp ${amount}
+
+📋 *Detail Pendaftaran*:
+${customField1}
+${customField2}
+${customField3}
+
+👤 *Pemesan*:
+Nama: ${notification.customer_details?.first_name || ''} ${notification.customer_details?.last_name || ''}
+Email: ${notification.customer_details?.email || ''}
+No HP: ${notification.customer_details?.phone || ''}
+
+✅ Status: LUNAS (${notification.transaction_status})
+      `.trim();
+
+      try {
+        await telegramBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        console.log(`📨 Telegram notification sent to ${chatId}`);
+      } catch (tgError) {
+        console.error('❌ Failed to send Telegram notification:', tgError.message);
+      }
+    }
+
   } catch (error) {
     console.error(`❌ Error handling success transaction for order ${orderId}:`, error);
     throw error;

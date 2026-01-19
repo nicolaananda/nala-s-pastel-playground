@@ -1,6 +1,6 @@
-# Apache .htaccess untuk Production Server
-# File ini digunakan jika website di-deploy dengan Apache (bukan Nginx)
-# Pastikan mod_rewrite, mod_headers, mod_expires, dan mod_deflate sudah diaktifkan
+# LiteSpeed .htaccess untuk Production Server
+# File ini digunakan jika website di-deploy dengan LiteSpeed Web Server
+# LiteSpeed kompatibel dengan Apache directives dan memiliki optimasi tambahan
 
 # Enable Rewrite Engine
 <IfModule mod_rewrite.c>
@@ -20,7 +20,14 @@
     RewriteRule . /index.html [L]
 </IfModule>
 
-# Enable Gzip Compression
+# LiteSpeed Cache Control (jika menggunakan LiteSpeed Cache plugin)
+# Uncomment jika menggunakan LiteSpeed Cache
+# <IfModule LiteSpeed>
+#     CacheLookup on
+#     CacheMaxExpire 604800
+# </IfModule>
+
+# Enable Gzip Compression (LiteSpeed mendukung dengan baik)
 <IfModule mod_deflate.c>
     # Compress HTML, CSS, JavaScript, Text, XML and fonts
     AddOutputFilterByType DEFLATE application/javascript
@@ -46,7 +53,10 @@
     AddOutputFilterByType DEFLATE text/plain
     AddOutputFilterByType DEFLATE text/xml
     
-    # Remove browser bugs (only needed for really old browsers)
+    # Set compression level (0-9, 6 adalah optimal)
+    DeflateCompressionLevel 6
+    
+    # Remove browser bugs
     BrowserMatch ^Mozilla/4 gzip-only-text/html
     BrowserMatch ^Mozilla/4\.0[678] no-gzip
     BrowserMatch \bMSIE !no-gzip !gzip-only-text/html
@@ -62,10 +72,16 @@
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
     
+    # LiteSpeed specific: Enable HTTP/2 Server Push (jika didukung)
+    # Header add Link "</assets/css/index-[hash].css>; rel=preload; as=style"
+    # Header add Link "</assets/js/vendor-[hash].js>; rel=preload; as=script"
+    
     # Cache static assets dengan hash (immutable) - 1 tahun
     <FilesMatch "^/assets/.+-[a-f0-9]+\.(js|css|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|webp|avif)$">
         Header set Cache-Control "public, immutable, max-age=31536000"
         Header set Vary "Accept-Encoding"
+        # LiteSpeed: Enable ESI (Edge Side Includes) jika diperlukan
+        # Header set X-LiteSpeed-Cache-Control "public, max-age=31536000"
     </FilesMatch>
     
     # NO CACHE untuk index.html (selalu fetch versi terbaru)
@@ -73,12 +89,17 @@
         Header set Cache-Control "no-cache, no-store, must-revalidate"
         Header set Pragma "no-cache"
         Header set Expires "0"
+        # LiteSpeed: Disable cache untuk index.html
+        # Header set X-LiteSpeed-Cache-Control "no-cache"
     </FilesMatch>
     
-    # Cache API responses dengan waktu lebih pendek (jika ada)
+    # Cache API responses dengan waktu lebih pendek
     <FilesMatch "^/api/">
         Header set Cache-Control "no-cache, must-revalidate"
     </FilesMatch>
+    
+    # LiteSpeed: Enable QUIC/HTTP3 (jika tersedia)
+    # Header always set Alt-Svc "h3=\":443\"; ma=86400"
 </IfModule>
 
 # Expires headers
@@ -144,3 +165,24 @@
     AddType application/manifest+json .webmanifest
 </IfModule>
 
+# LiteSpeed Specific Optimizations
+# Uncomment jika menggunakan fitur-fitur berikut:
+
+# Enable LiteSpeed Cache (jika plugin terinstall)
+# <IfModule LiteSpeed>
+#     CacheLookup on
+#     CacheMaxExpire 604800
+#     CacheDefaultExpire 3600
+# </IfModule>
+
+# Enable ESI (Edge Side Includes) untuk dynamic content
+# <IfModule LiteSpeed>
+#     CacheEnableESI on
+# </IfModule>
+
+# Enable HTTP/2 Server Push (jika didukung)
+# Header add Link "</assets/css/index-[hash].css>; rel=preload; as=style"
+# Header add Link "</assets/js/vendor-[hash].js>; rel=preload; as=script"
+
+# Enable QUIC/HTTP3 (jika tersedia di server)
+# Header always set Alt-Svc "h3=\":443\"; ma=86400, h3-29=\":443\"; ma=86400"
