@@ -58,6 +58,10 @@ TELEGRAM_CHAT_ID=123456789
 **Catatan:**
 - `TELEGRAM_BOT_TOKEN` = Token dari BotFather
 - `TELEGRAM_CHAT_ID` = ID chat Anda (bisa personal chat atau group chat)
+- **Multiple Recipients**: Pisahkan dengan koma untuk kirim ke beberapa chat
+  ```env
+  TELEGRAM_CHAT_ID=123456789,987654321,555666777
+  ```
 
 ### 4. Restart Server
 
@@ -182,19 +186,14 @@ const message = `
 
 ### Menambahkan Notifikasi ke Multiple Chat
 
-Ubah `TELEGRAM_CHAT_ID` menjadi array:
+Ubah `TELEGRAM_CHAT_ID` menjadi comma-separated list:
 
-```javascript
-const chatIds = process.env.TELEGRAM_CHAT_ID.split(',');
-for (const chatId of chatIds) {
-  await telegramBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-}
-```
-
-Lalu di `.env`:
 ```env
-TELEGRAM_CHAT_ID=123456789,987654321
+# Kirim ke 3 chat sekaligus
+TELEGRAM_CHAT_ID=123456789,987654321,555666777
 ```
+
+Notifikasi akan dikirim ke semua chat ID secara parallel. Jika salah satu gagal, yang lain tetap terkirim.
 
 ## 📚 Referensi
 

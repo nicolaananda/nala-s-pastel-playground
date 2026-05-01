@@ -4,19 +4,27 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
-const chatId = process.env.TELEGRAM_CHAT_ID;
+const chatIdConfig = process.env.TELEGRAM_CHAT_ID;
 
 if (!token) {
   console.error('❌ TELEGRAM_BOT_TOKEN not found in .env file');
   process.exit(1);
 }
 
-if (!chatId) {
+if (!chatIdConfig) {
   console.error('❌ TELEGRAM_CHAT_ID not found in .env file');
   process.exit(1);
 }
 
+const chatIds = chatIdConfig.split(',').map(id => id.trim()).filter(id => id);
+
+if (chatIds.length === 0) {
+  console.error('❌ No valid TELEGRAM_CHAT_ID found');
+  process.exit(1);
+}
+
 console.log('🚀 Testing Telegram Notification (Direct Send - No Database)\n');
+console.log(`📱 Sending to ${chatIds.length} recipient(s): ${chatIds.join(', ')}\n`);
 
 const bot = new TelegramBot(token, { polling: false });
 
@@ -89,8 +97,17 @@ ${testData.details}
   `.trim();
 
   try {
-    await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-    console.log(`✅ Sent: ${testData.type} - ${testData.orderId}`);
+    const sendPromises = chatIds.map(chatId =>
+      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+        .then(() => {
+          console.log(`✅ Sent to ${chatId}: ${testData.type} - ${testData.orderId}`);
+        })
+        .catch(err => {
+          console.error(`❌ Failed to send to ${chatId} (${testData.type}):`, err.message);
+        })
+    );
+    
+    await Promise.all(sendPromises);
   } catch (error) {
     console.error(`❌ Failed to send ${testData.type}:`, error.message);
   }

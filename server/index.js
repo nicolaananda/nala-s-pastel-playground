@@ -410,9 +410,15 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
     return;
   }
 
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!chatId) {
+  const chatIdConfig = process.env.TELEGRAM_CHAT_ID;
+  if (!chatIdConfig) {
     console.warn('⚠️ TELEGRAM_CHAT_ID not set - skipping notification');
+    return;
+  }
+
+  const chatIds = chatIdConfig.split(',').map(id => id.trim()).filter(id => id);
+  if (chatIds.length === 0) {
+    console.warn('⚠️ No valid TELEGRAM_CHAT_ID found - skipping notification');
     return;
   }
 
@@ -460,8 +466,17 @@ ${productDetails}
 ⏰ ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
     `.trim();
 
-    await telegramBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-    console.log(`✅ Telegram notification sent for order ${orderId}`);
+    const sendPromises = chatIds.map(chatId => 
+      telegramBot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+        .then(() => {
+          console.log(`✅ Telegram notification sent to ${chatId} for order ${orderId}`);
+        })
+        .catch(err => {
+          console.error(`❌ Failed to send to ${chatId}:`, err.message);
+        })
+    );
+
+    await Promise.all(sendPromises);
   } catch (error) {
     console.error('❌ Failed to send Telegram notification:', error.message);
   }
