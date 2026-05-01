@@ -28,6 +28,12 @@ MIDTRANS_IS_PRODUCTION=false
 # Dapatkan dari: https://rajaongkir.com/akun/daftar
 # Free tier: 10,000 requests/bulan
 RAJAONGKIR_API_KEY=your-rajaongkir-api-key-here
+
+# Telegram Bot Configuration (untuk notifikasi real-time)
+# Dapatkan bot token dari: https://t.me/BotFather
+# Cara mendapatkan Chat ID: jalankan `node get-telegram-id.js` setelah bot dibuat
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token-here
+TELEGRAM_CHAT_ID=your-telegram-chat-id-here
 ```
 
 2. Pastikan database PostgreSQL sudah dibuat:
@@ -85,6 +91,14 @@ Script ini akan:
 - Skip data yang sudah ada (berdasarkan transaction_id)
 
 ## Troubleshooting
+
+### Notifikasi Telegram tidak terkirim
+
+Jika notifikasi Telegram tidak terkirim setelah pembayaran:
+1. Pastikan `TELEGRAM_BOT_TOKEN` dan `TELEGRAM_CHAT_ID` sudah di-set di `.env`
+2. Jalankan `node get-telegram-id.js` untuk mendapatkan Chat ID yang benar
+3. Pastikan bot sudah di-start dengan mengirim `/start` ke bot Anda
+4. Cek log server untuk melihat error message
 
 ### Kode tidak terkirim setelah pembayaran
 

@@ -399,6 +399,70 @@ const initTelegramBot = () => {
 
 const telegramBot = initTelegramBot();
 
+// Telegram Notification Helper
+const sendTelegramNotification = async (orderId, transactionId, notification, code) => {
+  if (!telegramBot) {
+    console.warn('⚠️ Telegram bot not initialized - skipping notification');
+    return;
+  }
+
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!chatId) {
+    console.warn('⚠️ TELEGRAM_CHAT_ID not set - skipping notification');
+    return;
+  }
+
+  try {
+    const amount = parseFloat(notification.gross_amount).toLocaleString('id-ID');
+    const customerName = `${notification.customer_details?.first_name || ''} ${notification.customer_details?.last_name || ''}`.trim();
+    const customerEmail = notification.customer_details?.email || '-';
+    const customerPhone = notification.customer_details?.phone || '-';
+    const paymentType = notification.payment_type || '-';
+    
+    // Determine product type
+    let productType = 'Produk';
+    let productDetails = '';
+    
+    if (orderId.startsWith('BELAJAR-')) {
+      productType = '🎓 Kelas';
+      const customField1 = notification.custom_field1 || '';
+      const customField2 = notification.custom_field2 || '';
+      const customField3 = notification.custom_field3 || '';
+      productDetails = `\n📋 Detail Kelas:\n${customField1}\n${customField2}\n${customField3}`;
+    } else if (orderId.startsWith('SKET-')) {
+      productType = '📚 Sketchbook';
+    } else {
+      productType = '📖 Grasp Guide';
+    }
+
+    const message = `
+🎉 *PEMBAYARAN BERHASIL!*
+
+${productType}
+━━━━━━━━━━━━━━━━━━━━
+💳 *Order ID:* \`${orderId}\`
+💰 *Nominal:* Rp ${amount}
+🔑 *Kode Akses:* \`${code}\`
+💳 *Metode:* ${paymentType}
+✅ *Status:* LUNAS
+${productDetails}
+
+👤 *Data Pemesan:*
+━━━━━━━━━━━━━━━━━━━━
+📛 Nama: ${customerName}
+📧 Email: ${customerEmail}
+📱 No HP: ${customerPhone}
+
+⏰ ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
+    `.trim();
+
+    await telegramBot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    console.log(`✅ Telegram notification sent for order ${orderId}`);
+  } catch (error) {
+    console.error('❌ Failed to send Telegram notification:', error.message);
+  }
+};
+
 const handleSuccessTransaction = async (orderId, transactionId, notification) => {
   try {
     // Check if code already exists for this transaction
@@ -442,7 +506,10 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
 
     console.log(`✅ Generated/Saved code ${code} for order ${orderId}`);
 
-    // Send Email Notification for Classes (Replaces Telegram)
+    // Send Telegram Notification (Real-time for all purchases)
+    await sendTelegramNotification(orderId, transactionId, notification, code);
+
+    // Send Email Notification for Classes
     console.log(`🔍 Checking Email: isClass=${isClass}`);
 
     if (isClass) {
