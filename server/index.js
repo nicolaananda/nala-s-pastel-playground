@@ -400,6 +400,10 @@ const initTelegramBot = () => {
 const telegramBot = initTelegramBot();
 
 // Telegram Notification Helper
+const escapeMarkdown = (text) => {
+  return String(text).replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+};
+
 const sendTelegramNotification = async (orderId, transactionId, notification, code) => {
   if (!telegramBot) {
     console.warn('⚠️ Telegram bot not initialized - skipping notification');
@@ -414,10 +418,10 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
 
   try {
     const amount = parseFloat(notification.gross_amount).toLocaleString('id-ID');
-    const customerName = `${notification.customer_details?.first_name || ''} ${notification.customer_details?.last_name || ''}`.trim();
-    const customerEmail = notification.customer_details?.email || '-';
-    const customerPhone = notification.customer_details?.phone || '-';
-    const paymentType = notification.payment_type || '-';
+    const customerName = escapeMarkdown(`${notification.customer_details?.first_name || ''} ${notification.customer_details?.last_name || ''}`.trim());
+    const customerEmail = escapeMarkdown(notification.customer_details?.email || '-');
+    const customerPhone = escapeMarkdown(notification.customer_details?.phone || '-');
+    const paymentType = escapeMarkdown(notification.payment_type || '-');
     
     // Determine product type
     let productType = 'Produk';
@@ -425,9 +429,9 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
     
     if (orderId.startsWith('BELAJAR-')) {
       productType = '🎓 Kelas';
-      const customField1 = notification.custom_field1 || '';
-      const customField2 = notification.custom_field2 || '';
-      const customField3 = notification.custom_field3 || '';
+      const customField1 = escapeMarkdown(notification.custom_field1 || '');
+      const customField2 = escapeMarkdown(notification.custom_field2 || '');
+      const customField3 = escapeMarkdown(notification.custom_field3 || '');
       productDetails = `\n📋 Detail Kelas:\n${customField1}\n${customField2}\n${customField3}`;
     } else if (orderId.startsWith('SKET-')) {
       productType = '📚 Sketchbook';

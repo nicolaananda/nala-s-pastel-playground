@@ -20,6 +20,10 @@ console.log('🚀 Testing Telegram Notification (Direct Send - No Database)\n');
 
 const bot = new TelegramBot(token, { polling: false });
 
+const escapeMarkdown = (text) => {
+  return String(text).replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+};
+
 const testNotifications = [
   {
     type: '🎓 Kelas',
@@ -58,6 +62,10 @@ const testNotifications = [
 
 async function sendTestNotification(testData) {
   const amount = parseFloat(testData.amount).toLocaleString('id-ID');
+  const customerName = escapeMarkdown(testData.customerName);
+  const customerEmail = escapeMarkdown(testData.customerEmail);
+  const customerPhone = escapeMarkdown(testData.customerPhone);
+  const paymentType = escapeMarkdown(testData.paymentType);
   
   const message = `
 🎉 *PEMBAYARAN BERHASIL!*
@@ -67,15 +75,15 @@ ${testData.type}
 💳 *Order ID:* \`${testData.orderId}\`
 💰 *Nominal:* Rp ${amount}
 🔑 *Kode Akses:* \`${testData.code}\`
-💳 *Metode:* ${testData.paymentType}
+💳 *Metode:* ${paymentType}
 ✅ *Status:* LUNAS
 ${testData.details}
 
 👤 *Data Pemesan:*
 ━━━━━━━━━━━━━━━━━━━━
-📛 Nama: ${testData.customerName}
-📧 Email: ${testData.customerEmail}
-📱 No HP: ${testData.customerPhone}
+📛 Nama: ${customerName}
+📧 Email: ${customerEmail}
+📱 No HP: ${customerPhone}
 
 ⏰ ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
   `.trim();
