@@ -221,125 +221,107 @@ app.post('/api/grasp-guide/verify-code', async (req, res) => {
   }
 });
 
-// RajaOngkir Shipping Cost Calculation
+// Shipping (api.co.id Indonesia Expedition Cost)
+// Origin: Tembalang, Kota Semarang, Jawa Tengah
+const ORIGIN_VILLAGE_CODE = process.env.ORIGIN_VILLAGE_CODE || '3374101006';
+const API_CO_ID_BASE = 'https://use.api.co.id';
+
+const apiCoIdHeaders = () => {
+  const key = process.env.API_CO_ID_KEY;
+  if (!key) return null;
+  return { 'x-api-co-id': key };
+};
+
+// Search villages (proxy ke api.co.id, untuk autocomplete alamat)
+app.get('/api/shipping/villages', async (req, res) => {
+  try {
+    const search = (req.query.search || '').toString().trim();
+    if (search.length < 2) {
+      return res.json({ villages: [] });
+    }
+
+    const headers = apiCoIdHeaders();
+    if (!headers) {
+      console.warn('⚠️ API_CO_ID_KEY not set');
+      return res.status(503).json({ message: 'Shipping API not configured', villages: [] });
+    }
+
+    const url = `${API_CO_ID_BASE}/regional/indonesia/villages?search=${encodeURIComponent(search)}`;
+    const response = await axios.get(url, { headers, timeout: 10000 });
+    const items = Array.isArray(response.data?.data) ? response.data.data : [];
+
+    const villages = items.slice(0, 25).map((v) => ({
+      code: v.code,
+      name: v.name,
+      district: v.district,
+      regency: v.regency,
+      province: v.province,
+      label: `${v.name}, ${v.district}, ${v.regency}, ${v.province}`,
+    }));
+
+    res.json({ villages });
+  } catch (error) {
+    console.error('Villages search error:', error.response?.data || error.message);
+    res.status(500).json({ message: 'Failed to search villages', villages: [] });
+  }
+});
+
+// Calculate shipping cost (proxy ke api.co.id)
 app.post('/api/shipping/calculate', async (req, res) => {
   try {
-    const { origin, destination, weight, courier } = req.body;
+    const { destinationVillageCode, weight } = req.body || {};
 
-    // Validate required fields
-    if (!origin || !destination || !weight || !courier) {
-      return res.status(400).json({
-        message: 'Missing required fields: origin, destination, weight, courier'
-      });
+    if (!destinationVillageCode || typeof destinationVillageCode !== 'string') {
+      return res.status(400).json({ message: 'destinationVillageCode required' });
+    }
+    const w = parseInt(weight, 10);
+    if (!w || w <= 0) {
+      return res.status(400).json({ message: 'weight must be a positive integer (grams)' });
     }
 
-    // Check if RajaOngkir API key is set
-    if (!process.env.RAJAONGKIR_API_KEY) {
-      // Return fallback estimated costs
-      return res.json(getFallbackShippingCost(courier));
+    const headers = apiCoIdHeaders();
+    if (!headers) {
+      return res.json(getFallbackShippingCost());
     }
 
-    // Call RajaOngkir API
-    const response = await axios.post(
-      'https://api.rajaongkir.com/starter/cost',
-      {
-        origin,
-        destination,
-        weight,
-        courier,
-      },
-      {
-        headers: {
-          key: process.env.RAJAONGKIR_API_KEY,
-        },
-      }
-    );
+    const url = new URL(`${API_CO_ID_BASE}/expedition/shipping-cost`);
+    url.searchParams.set('origin_village_code', ORIGIN_VILLAGE_CODE);
+    url.searchParams.set('destination_village_code', destinationVillageCode);
+    url.searchParams.set('weight', String(w));
 
-    // Parse response
-    const result = response.data.rajaongkir.results[0];
-    const costs = result.costs.map((cost) => ({
-      service: cost.service,
-      description: cost.description,
-      cost: cost.cost[0].value,
-      etd: cost.cost[0].etd,
-    }));
+    const response = await axios.get(url.toString(), { headers, timeout: 15000 });
+    const couriers = Array.isArray(response.data?.data?.couriers) ? response.data.data.couriers : [];
 
-    res.json({
-      courier: result.code,
-      costs,
-    });
+    // Filter kurir dengan harga > 0 dan harga wajar (< Rp 1jt untuk paket < 5kg)
+    const costs = couriers
+      .filter((c) => Number(c.price) > 0 && Number(c.price) < 1_000_000)
+      .map((c) => ({
+        courierCode: c.courier_code,
+        courierName: c.courier_name,
+        service: c.courier_code,
+        description: c.courier_name,
+        cost: Number(c.price),
+        etd: c.estimation || '-',
+      }))
+      .sort((a, b) => a.cost - b.cost);
+
+    if (costs.length === 0) {
+      return res.json(getFallbackShippingCost());
+    }
+
+    res.json({ costs });
   } catch (error) {
-    console.error('RajaOngkir error:', error.response?.data || error.message);
-
-    // Return fallback if API fails
-    const fallback = getFallbackShippingCost(req.body.courier || 'jne');
-    res.json(fallback);
+    console.error('Shipping calculate error:', error.response?.data || error.message);
+    res.json(getFallbackShippingCost());
   }
 });
 
-// Get cities (for city search/autocomplete)
-app.get('/api/shipping/cities', async (req, res) => {
-  try {
-    const { search } = req.query;
-
-    if (!search) {
-      return res.status(400).json({ message: 'Search parameter is required' });
-    }
-
-    // Check if RajaOngkir API key is set
-    if (!process.env.RAJAONGKIR_API_KEY) {
-      return res.status(503).json({
-        message: 'RajaOngkir API key not configured'
-      });
-    }
-
-    // Call RajaOngkir API to get cities
-    const response = await axios.get(
-      `https://api.rajaongkir.com/starter/city?q=${encodeURIComponent(search)}`,
-      {
-        headers: {
-          key: process.env.RAJAONGKIR_API_KEY,
-        },
-      }
-    );
-
-    const cities = response.data.rajaongkir.results.map((city) => ({
-      city_id: city.city_id,
-      city_name: `${city.city_name}, ${city.province}`,
-      province: city.province,
-    }));
-
-    res.json(cities);
-  } catch (error) {
-    console.error('RajaOngkir cities error:', error.response?.data || error.message);
-    res.status(500).json({
-      message: 'Failed to fetch cities',
-      error: error.message
-    });
-  }
-});
-
-// Fallback shipping cost function
-function getFallbackShippingCost(courier) {
-  const baseCosts = {
-    jne: [
-      { service: 'REG', description: 'JNE Reguler', cost: 15000, etd: '2-3 hari' },
-      { service: 'OKE', description: 'JNE OKE', cost: 20000, etd: '1-2 hari' },
-      { service: 'YES', description: 'JNE YES', cost: 30000, etd: '1 hari' },
-    ],
-    tiki: [
-      { service: 'REG', description: 'TIKI Reguler', cost: 18000, etd: '2-3 hari' },
-      { service: 'ECO', description: 'TIKI ECO', cost: 25000, etd: '1-2 hari' },
-    ],
-    pos: [
-      { service: 'Paket Kilat Khusus', description: 'POS Kilat Khusus', cost: 20000, etd: '1-2 hari' },
-      { service: 'Paketpos', description: 'POS Reguler', cost: 12000, etd: '3-5 hari' },
-    ],
-  };
-
+function getFallbackShippingCost() {
   return {
-    courier: courier || 'jne',
-    costs: baseCosts[courier] || baseCosts.jne,
+    costs: [
+      { courierCode: 'JNE', courierName: 'JNE Reguler', service: 'JNE', description: 'JNE Reguler', cost: 20000, etd: '2-3 hari' },
+      { courierCode: 'SiCepat', courierName: 'SiCepat Reguler', service: 'SiCepat', description: 'SiCepat Reguler', cost: 18000, etd: '2-3 hari' },
+    ],
   };
 }
 

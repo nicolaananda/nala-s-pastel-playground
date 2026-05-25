@@ -4,8 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -14,8 +14,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import VillagePicker from "@/components/VillagePicker";
 import { createMidtransShirtPaymentLink } from "@/lib/midtrans";
-import { calculateShippingCost, ShippingResponse, ShippingCost } from "@/lib/shipping";
+import {
+  calculateShippingCost,
+  ShippingCost,
+  VillageOption,
+  DEFAULT_SHIRT_WEIGHT,
+} from "@/lib/shipping";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -31,10 +37,7 @@ const shirtCheckoutSchema = z.object({
   email: z.string().email("Email tidak valid"),
   phone: z.string().min(10, "Nomor telepon minimal 10 digit"),
   address: z.string().min(10, "Alamat lengkap minimal 10 karakter"),
-  city: z.string().min(2, "Kota harus diisi"),
   postalCode: z.string().min(5, "Kode pos minimal 5 digit"),
-  province: z.string().min(2, "Provinsi harus diisi"),
-  courier: z.enum(["jne", "tiki", "pos"]),
   shippingService: z.string().min(1, "Pilih layanan pengiriman"),
 });
 
@@ -55,7 +58,8 @@ const ShirtCheckoutForm = ({
   priceDewasa,
   onPaymentSuccess,
 }: ShirtCheckoutFormProps) => {
-  const [shippingOptions, setShippingOptions] = useState<ShippingResponse | null>(null);
+  const [village, setVillage] = useState<VillageOption | null>(null);
+  const [shippingOptions, setShippingOptions] = useState<ShippingCost[]>([]);
   const [selectedShippingCost, setSelectedShippingCost] = useState<number>(0);
   const [isLoadingShipping, setIsLoadingShipping] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -71,67 +75,73 @@ const ShirtCheckoutForm = ({
     defaultValues: {
       category: "dewasa",
       quantity: 1,
-      courier: "jne",
     },
   });
 
   const watchedCategory = watch("category");
   const watchedSize = watch("size");
   const watchedQuantity = watch("quantity") || 1;
-  const watchedCity = watch("city");
-  const watchedCourier = watch("courier");
 
   const unitPrice = watchedCategory === "anak" ? priceAnak : priceDewasa;
   const subtotal = unitPrice * watchedQuantity;
   const totalAmount = subtotal + selectedShippingCost;
+  const totalWeight = DEFAULT_SHIRT_WEIGHT * watchedQuantity;
 
   const sizeOptions = watchedCategory === "anak" ? SIZES_ANAK : SIZES_DEWASA;
 
-  // Reset size when category changes
+  // Reset size kalau kategori ganti
   useEffect(() => {
     setValue("size", "");
   }, [watchedCategory, setValue]);
 
-  // Fetch shipping options when city or courier changes
+  // Hitung ongkir saat village atau qty berubah (qty pengaruhi berat)
   useEffect(() => {
-    if (watchedCity && watchedCity.length >= 2) {
-      fetchShippingOptions(watchedCity, watchedCourier);
+    if (!village) {
+      setShippingOptions([]);
+      setSelectedShippingCost(0);
+      setValue("shippingService", "");
+      return;
     }
-  }, [watchedCity, watchedCourier]);
 
-  const fetchShippingOptions = async (city: string, courier: "jne" | "tiki" | "pos") => {
-    if (!city || city.length < 2) return;
+    let cancelled = false;
+    const fetchShipping = async () => {
+      setIsLoadingShipping(true);
+      try {
+        const response = await calculateShippingCost(village.code, totalWeight);
+        if (cancelled) return;
+        setShippingOptions(response.costs);
+        if (response.costs.length > 0) {
+          setValue("shippingService", response.costs[0].service);
+          setSelectedShippingCost(response.costs[0].cost);
+        } else {
+          setValue("shippingService", "");
+          setSelectedShippingCost(0);
+        }
+      } catch (error) {
+        console.error("Shipping calculation error:", error);
+      } finally {
+        if (!cancelled) setIsLoadingShipping(false);
+      }
+    };
+    fetchShipping();
 
-    setIsLoadingShipping(true);
-    try {
-      const response = await calculateShippingCost(city, city, courier);
-      setShippingOptions(response);
-      if (response.costs.length > 0) {
-        setValue("shippingService", response.costs[0].service);
-        setSelectedShippingCost(response.costs[0].cost);
-      }
-    } catch (error) {
-      console.error("Shipping calculation error:", error);
-      const fallback = await calculateShippingCost(city, city, courier);
-      setShippingOptions(fallback);
-      if (fallback.costs.length > 0) {
-        setValue("shippingService", fallback.costs[0].service);
-        setSelectedShippingCost(fallback.costs[0].cost);
-      }
-    } finally {
-      setIsLoadingShipping(false);
-    }
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, [village, totalWeight, setValue]);
 
   const handleShippingServiceChange = (service: string) => {
     setValue("shippingService", service);
-    const selectedService = shippingOptions?.costs.find((cost) => cost.service === service);
-    if (selectedService) {
-      setSelectedShippingCost(selectedService.cost);
-    }
+    const selected = shippingOptions.find((cost) => cost.service === service);
+    if (selected) setSelectedShippingCost(selected.cost);
   };
 
   const onSubmit = async (data: ShirtCheckoutFormData) => {
+    if (!village) {
+      toast.error("Pilih kelurahan/desa tujuan dulu");
+      return;
+    }
+
     setIsProcessingPayment(true);
     try {
       const paymentResponse = await createMidtransShirtPaymentLink({
@@ -147,10 +157,10 @@ const ShirtCheckoutForm = ({
           lastName: data.lastName,
           email: data.email,
           phone: data.phone,
-          address: data.address,
-          city: data.city,
+          address: `${data.address}, ${village.name}, ${village.district}`,
+          city: village.regency,
           postalCode: data.postalCode,
-          province: data.province,
+          province: village.province,
         },
       });
 
@@ -193,10 +203,10 @@ const ShirtCheckoutForm = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="anak">
-                      Anak - Rp {priceAnak.toLocaleString("id-ID")}
+                      Anak — Rp {priceAnak.toLocaleString("id-ID")}
                     </SelectItem>
                     <SelectItem value="dewasa">
-                      Dewasa - Rp {priceDewasa.toLocaleString("id-ID")}
+                      Dewasa — Rp {priceDewasa.toLocaleString("id-ID")}
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -288,7 +298,7 @@ const ShirtCheckoutForm = ({
               <Textarea
                 id="address"
                 {...register("address")}
-                placeholder="Jl. Contoh No. 123, RT/RW, Kelurahan"
+                placeholder="Jl. Contoh No. 123, RT/RW"
                 rows={3}
               />
               {errors.address && (
@@ -296,22 +306,14 @@ const ShirtCheckoutForm = ({
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="city">Kota *</Label>
-                <Input id="city" {...register("city")} placeholder="Contoh: Jakarta" />
-                {errors.city && (
-                  <p className="text-sm text-destructive mt-1">{errors.city.message}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="province">Provinsi *</Label>
-                <Input id="province" {...register("province")} placeholder="Contoh: DKI Jakarta" />
-                {errors.province && (
-                  <p className="text-sm text-destructive mt-1">{errors.province.message}</p>
-                )}
-              </div>
+            <div>
+              <Label htmlFor="village">Kelurahan/Desa *</Label>
+              <VillagePicker id="village" value={village} onChange={setVillage} />
+              {village && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {village.district}, {village.regency}, {village.province}
+                </p>
+              )}
             </div>
 
             <div>
@@ -327,29 +329,16 @@ const ShirtCheckoutForm = ({
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-primary">Pilihan Pengiriman</h3>
 
-            <div>
-              <Label htmlFor="courier">Kurir *</Label>
-              <Select
-                value={watchedCourier}
-                onValueChange={(value) => setValue("courier", value as "jne" | "tiki" | "pos")}
-              >
-                <SelectTrigger id="courier">
-                  <SelectValue placeholder="Pilih kurir" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="jne">JNE</SelectItem>
-                  <SelectItem value="tiki">TIKI</SelectItem>
-                  <SelectItem value="pos">POS Indonesia</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {isLoadingShipping ? (
+            {!village ? (
+              <p className="text-sm text-muted-foreground">
+                Pilih kelurahan/desa tujuan dulu untuk melihat opsi pengiriman
+              </p>
+            ) : isLoadingShipping ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Menghitung ongkir...</span>
               </div>
-            ) : shippingOptions && shippingOptions.costs.length > 0 ? (
+            ) : shippingOptions.length > 0 ? (
               <div>
                 <Label htmlFor="shippingService">Layanan Pengiriman *</Label>
                 <Select
@@ -360,9 +349,9 @@ const ShirtCheckoutForm = ({
                     <SelectValue placeholder="Pilih layanan" />
                   </SelectTrigger>
                   <SelectContent>
-                    {shippingOptions.costs.map((cost: ShippingCost) => (
+                    {shippingOptions.map((cost) => (
                       <SelectItem key={cost.service} value={cost.service}>
-                        {cost.description} - Rp {cost.cost.toLocaleString("id-ID")} ({cost.etd})
+                        {cost.description} — Rp {cost.cost.toLocaleString("id-ID")} ({cost.etd})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -373,7 +362,7 @@ const ShirtCheckoutForm = ({
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Masukkan kota untuk melihat pilihan pengiriman
+                Tidak ada layanan pengiriman tersedia
               </p>
             )}
           </div>
@@ -391,7 +380,7 @@ const ShirtCheckoutForm = ({
               <span className="font-semibold">
                 {selectedShippingCost > 0
                   ? `Rp ${selectedShippingCost.toLocaleString("id-ID")}`
-                  : "Menghitung..."}
+                  : "—"}
               </span>
             </div>
             <div className="flex justify-between text-lg font-bold text-primary pt-2 border-t">
@@ -404,7 +393,7 @@ const ShirtCheckoutForm = ({
             type="submit"
             className="w-full"
             size="lg"
-            disabled={isProcessingPayment || selectedShippingCost === 0}
+            disabled={isProcessingPayment || !village || selectedShippingCost === 0}
           >
             {isProcessingPayment ? (
               <>
