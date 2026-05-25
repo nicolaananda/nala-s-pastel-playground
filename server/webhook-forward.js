@@ -2,18 +2,31 @@ import axios from 'axios';
 
 /**
  * Forward webhook dari bot-wa ke server nala
- * 
+ *
  * Gunakan ini di webhook handler bot-wa untuk forward webhook ke server nala
- * jika order_id mengandung "CLASS-" atau "GG-" (untuk Grasp Guide)
+ * jika order_id memiliki prefix milik nala (buku, kelas, sketchbook, grasp guide).
  */
+
+// Daftar prefix order_id milik nala yang harus diforward.
+// Sumber: src/lib/midtrans.ts (BOOK-, BELAJAR-, SKET-, BAJU-, GG-, GRASP-, CLASS-).
+const NALA_ORDER_PREFIXES = [
+  'BOOK-',
+  'BELAJAR-',
+  'SKET-',
+  'BAJU-',
+  'GG-',
+  'GRASP-',
+  'CLASS-',
+];
+
+const isNalaOrderId = (orderId = '') =>
+  NALA_ORDER_PREFIXES.some((prefix) => orderId.startsWith(prefix));
+
 export const forwardToNalaWebhook = async (notification) => {
   const nalaWebhookUrl = process.env.NALA_WEBHOOK_URL || 'https://api.artstudionala.com/api/midtrans/notification';
   const orderId = notification.order_id || '';
 
-  // Cek apakah ini transaksi untuk nala (Grasp Guide atau Class)
-  const isNalaTransaction = orderId.includes('CLASS-') || orderId.includes('GG-') || orderId.includes('GRASP-');
-
-  if (!isNalaTransaction) {
+  if (!isNalaOrderId(orderId)) {
     console.log(`[Webhook Forward] Skipping - not a nala transaction: ${orderId}`);
     return { forwarded: false, reason: 'not_nala_transaction' };
   }
@@ -41,19 +54,20 @@ export const forwardToNalaWebhook = async (notification) => {
 
 /**
  * Contoh penggunaan di bot-wa webhook handler:
- * 
+ *
  * app.post('/webhook/midtrans', async (req, res) => {
  *   const notification = req.body;
- *   
+ *
  *   // Process untuk bot-wa
  *   await processBotWaNotification(notification);
- *   
+ *
  *   // Forward ke nala jika perlu
  *   await forwardToNalaWebhook(notification);
- *   
+ *
  *   res.status(200).json({ status: 'OK' });
  * });
  */
+
 
 
 

@@ -254,7 +254,6 @@ export interface MidtransSketchPaymentRequest {
 export const createMidtransSketchPaymentLink = async (
   request: MidtransSketchPaymentRequest
 ): Promise<MidtransPaymentResponse> => {
-  // Prepare request body for backend API
   const requestBody = {
     transaction_details: {
       order_id: `SKET-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -277,7 +276,6 @@ export const createMidtransSketchPaymentLink = async (
   };
 
   try {
-    // Call backend API endpoint
     const baseUrl = import.meta.env.VITE_API_URL || '';
     const apiUrl = `${baseUrl}/api/midtrans/create-payment-link`;
 
@@ -302,6 +300,110 @@ export const createMidtransSketchPaymentLink = async (
     };
   } catch (error) {
     console.error('Midtrans sketch payment link creation error:', error);
+    throw error;
+  }
+};
+
+// Shirt Purchase Payment
+export interface MidtransShirtPaymentRequest {
+  shirtId: string;
+  shirtTitle: string;
+  price: number;
+  shippingCost: number;
+  size: string;
+  category: 'anak' | 'dewasa';
+  quantity: number;
+  customerDetails: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    postalCode: string;
+    province: string;
+  };
+}
+
+export const createMidtransShirtPaymentLink = async (
+  request: MidtransShirtPaymentRequest
+): Promise<MidtransPaymentResponse> => {
+  const subtotal = request.price * request.quantity;
+  const totalAmount = subtotal + request.shippingCost;
+
+  const requestBody = {
+    transaction_details: {
+      order_id: `BAJU-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      gross_amount: totalAmount,
+    },
+    item_details: [
+      {
+        id: request.shirtId,
+        price: request.price,
+        quantity: request.quantity,
+        name: `${request.shirtTitle} (${request.category} - ${request.size})`.slice(0, 50),
+      },
+      {
+        id: 'shipping',
+        price: request.shippingCost,
+        quantity: 1,
+        name: 'Ongkir',
+      },
+    ],
+    customer_details: {
+      first_name: request.customerDetails.firstName,
+      last_name: request.customerDetails.lastName,
+      email: request.customerDetails.email,
+      phone: request.customerDetails.phone,
+      billing_address: {
+        first_name: request.customerDetails.firstName,
+        last_name: request.customerDetails.lastName,
+        phone: request.customerDetails.phone,
+        address: request.customerDetails.address,
+        city: request.customerDetails.city,
+        postal_code: request.customerDetails.postalCode,
+        country_code: 'IDN',
+      },
+      shipping_address: {
+        first_name: request.customerDetails.firstName,
+        last_name: request.customerDetails.lastName,
+        phone: request.customerDetails.phone,
+        address: request.customerDetails.address,
+        city: request.customerDetails.city,
+        postal_code: request.customerDetails.postalCode,
+        country_code: 'IDN',
+      },
+    },
+    custom_field1: `Produk: ${request.shirtTitle}`,
+    custom_field2: `Kategori: ${request.category} | Size: ${request.size} | Qty: ${request.quantity}`,
+    custom_field3: `Alamat: ${request.customerDetails.address}, ${request.customerDetails.city}, ${request.customerDetails.province} ${request.customerDetails.postalCode}`,
+  };
+
+  try {
+    const baseUrl = import.meta.env.VITE_API_URL || '';
+    const apiUrl = `${baseUrl}/api/midtrans/create-payment-link`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      await handlePaymentError(response);
+    }
+
+    const data = await response.json();
+
+    return {
+      paymentUrl: data.payment_url || data.snap_url || data.redirect_url,
+      orderId: data.order_id || requestBody.transaction_details.order_id,
+      token: data.token,
+    };
+  } catch (error) {
+    console.error('Midtrans shirt payment link creation error:', error);
     throw error;
   }
 };

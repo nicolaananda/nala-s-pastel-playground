@@ -27,6 +27,7 @@ interface ClassRegistrationFormProps {
   classId: string;
   className: string;
   classPrice: number;
+  classSchedule?: string;
   onPaymentSuccess?: (paymentUrl: string) => void;
 }
 
@@ -34,6 +35,7 @@ const ClassRegistrationForm = ({
   classId,
   className,
   classPrice,
+  classSchedule,
   onPaymentSuccess
 }: ClassRegistrationFormProps) => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -44,6 +46,9 @@ const ClassRegistrationForm = ({
     formState: { errors },
   } = useForm<ClassRegistrationFormData>({
     resolver: zodResolver(classRegistrationSchema),
+    defaultValues: {
+      classDay: classSchedule || "",
+    },
   });
 
   const onSubmit = async (data: ClassRegistrationFormData) => {
@@ -99,6 +104,12 @@ const ClassRegistrationForm = ({
           <div className="bg-primary/10 p-4 rounded-lg border border-primary/20 mb-6">
             <p className="text-sm text-muted-foreground mb-1">Kelas yang dipilih:</p>
             <p className="font-semibold text-lg">{className}</p>
+            {classSchedule && (
+              <p className="text-sm font-medium text-foreground mt-1 flex items-center gap-1">
+                <span>📅</span>
+                <span>{classSchedule}</span>
+              </p>
+            )}
             <p className="text-2xl font-bold text-primary mt-2">
               Rp {classPrice.toLocaleString("id-ID")}
             </p>
@@ -143,7 +154,13 @@ const ClassRegistrationForm = ({
 
             <div className="space-y-2">
               <Label htmlFor="classDay">Pilihan Hari *</Label>
-              <Input id="classDay" {...register("classDay")} placeholder="Contoh: Senin 15.00" />
+              <Input
+                id="classDay"
+                {...register("classDay")}
+                placeholder="Contoh: Senin 15.00"
+                readOnly={!!classSchedule}
+                className={classSchedule ? "bg-muted cursor-not-allowed" : ""}
+              />
               {errors.classDay && <p className="text-destructive text-sm">{errors.classDay.message}</p>}
             </div>
           </div>

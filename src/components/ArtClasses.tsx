@@ -16,71 +16,43 @@ import beginnerImgFallback from "@/assets/begin.jpeg";
 import beginnerDrawingImg from "@/assets/begsed.jpeg?w=400&format=webp&quality=65";
 import beginnerDrawingImgFallback from "@/assets/begsed.jpeg";
 // @ts-ignore - vite-imagetools handles this
-import intermediateLandscapeImg from "@/assets/adlam.jpeg?w=400&format=webp&quality=60";
-import intermediateLandscapeImgFallback from "@/assets/adlam.jpeg";
-// @ts-ignore - vite-imagetools handles this
 import intermediateDrawingImg from "@/assets/interkolor.jpeg?w=400&format=webp&quality=65";
 import intermediateDrawingImgFallback from "@/assets/interkolor.jpeg";
-// @ts-ignore - vite-imagetools handles this
-import advancedImg from "@/assets/belajar gambar digital.jpeg?w=400&format=webp&quality=65";
-import advancedImgFallback from "@/assets/belajar gambar digital.jpeg";
 
 const classes = [
   {
-    id: "beginner-coloring",
-    level: "Beginner Coloring",
+    id: "coloring-silky-crayon",
+    level: "Coloring Silky Crayon",
     image: beginnerImg,
     imageFallback: beginnerImgFallback,
-    description: "Kelas mewarnai untuk pemula.",
+    description: "Kelas mewarnai dengan silky crayon.",
+    schedule: "Kamis, 14.00 WIB",
     topics: [],
     gradient: "gradient-pink",
     price: 150000,
-    originalPrice: 0,
   },
   {
-    id: "beginner-drawing",
-    level: "Beginner Drawing Doodling",
+    id: "drawing-chibi-acrylic-marker",
+    level: "Drawing Chibi Acrylic Marker",
     image: beginnerDrawingImg,
     imageFallback: beginnerDrawingImgFallback,
-    description: "Belajar menggambar dan doodling dasar.",
-    topics: [],
-    gradient: "gradient-pink",
-    price: 150000,
-    originalPrice: 0,
-  },
-  {
-    id: "intermediate-landscape",
-    level: "Intermediate Landscape",
-    image: intermediateLandscapeImg,
-    imageFallback: intermediateLandscapeImgFallback,
-    description: "Menggambar pemandangan tingkat menengah.",
+    description: "Menggambar karakter chibi dengan acrylic marker.",
+    schedule: "Jumat, 19.00 WIB",
     topics: [],
     gradient: "gradient-pink-blue",
-    price: 160000,
-    originalPrice: 0,
+    price: 150000,
   },
   {
-    id: "intermediate-drawing-coloring",
-    level: "Intermediate Drawing Coloring",
+    id: "melengkapi-gambar-mewarnai",
+    level: "Melengkapi Gambar & Mewarnai",
     image: intermediateDrawingImg,
     imageFallback: intermediateDrawingImgFallback,
-    description: "Teknik menggambar dan mewarnai tingkat lanjut.",
-    topics: [],
-    gradient: "gradient-pink-blue",
-    price: 160000,
-    originalPrice: 0,
-  },
-  {
-    id: "advanced-digital",
-    level: "Advanced Digital Art Class",
-    image: advancedImg,
-    imageFallback: advancedImgFallback,
-    description: "Kelas seni digital tingkat mahir.",
+    description: "Latihan melengkapi gambar dan mewarnai.",
+    schedule: "Sabtu, 16.00 WIB",
     topics: [],
     gradient: "gradient-blue",
-    price: 185000,
-    originalPrice: 0,
-  }
+    price: 150000,
+  },
 ];
 
 const ArtClasses = () => {
@@ -151,22 +123,21 @@ const ArtClasses = () => {
                 <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground mb-2">
                   {artClass.level}
                 </CardTitle>
-                <CardDescription className="text-sm sm:text-base text-muted-foreground mb-4">
+                <CardDescription className="text-sm sm:text-base text-muted-foreground mb-3">
                   {artClass.description}
                 </CardDescription>
 
+                {/* Schedule */}
+                <div className="mb-4 flex items-center gap-2 text-sm sm:text-base font-semibold text-foreground bg-accent/30 rounded-lg px-3 py-2">
+                  <span>📅</span>
+                  <span>{artClass.schedule}</span>
+                </div>
+
                 {/* Price Section */}
                 <div className="mb-4">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl sm:text-3xl font-bold text-primary">
-                      Rp {artClass.price.toLocaleString("id-ID")}
-                    </span>
-                    {artClass.originalPrice && artClass.originalPrice > artClass.price && (
-                      <span className="text-sm sm:text-base text-muted-foreground line-through">
-                        Rp {artClass.originalPrice.toLocaleString("id-ID")}
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-2xl sm:text-3xl font-bold text-primary">
+                    Rp {artClass.price.toLocaleString("id-ID")}
+                  </span>
                 </div>
               </CardHeader>
 
@@ -214,6 +185,7 @@ const ArtClasses = () => {
               classId={selectedClass.id}
               className={selectedClass.level}
               classPrice={selectedClass.price}
+              classSchedule={selectedClass.schedule}
               onPaymentSuccess={handlePaymentSuccess}
             />
           )}

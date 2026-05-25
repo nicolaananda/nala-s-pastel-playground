@@ -400,8 +400,79 @@ const initTelegramBot = () => {
 const telegramBot = initTelegramBot();
 
 // Telegram Notification Helper
-const escapeMarkdown = (text) => {
-  return String(text).replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+const escapeHtml = (text) => {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+};
+
+// Parse "Key: Value | Key: Value" jadi array { label, value }
+const parsePipeFields = (raw) => {
+  if (!raw) return [];
+  return String(raw)
+    .split('|')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const idx = part.indexOf(':');
+      if (idx === -1) return { label: '', value: part };
+      return {
+        label: part.slice(0, idx).trim(),
+        value: part.slice(idx + 1).trim(),
+      };
+    });
+};
+
+const buildProductSection = (orderId, notification) => {
+  const cf1 = notification.custom_field1 || '';
+  const cf2 = notification.custom_field2 || '';
+  const cf3 = notification.custom_field3 || '';
+
+  if (orderId.startsWith('BELAJAR-')) {
+    const lines = ['<b>🎓 Detail Kelas</b>'];
+    parsePipeFields(cf3).forEach(({ label, value }) => {
+      if (label) lines.push(`• <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`);
+    });
+    parsePipeFields(cf1).forEach(({ label, value }) => {
+      if (label) lines.push(`• <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`);
+    });
+    parsePipeFields(cf2).forEach(({ label, value }) => {
+      if (label) lines.push(`• <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`);
+    });
+    return { title: '🎓 Kelas', body: lines.join('\n') };
+  }
+
+  if (orderId.startsWith('BAJU-')) {
+    const lines = ['<b>👕 Detail Pesanan</b>'];
+    parsePipeFields(cf1).forEach(({ label, value }) => {
+      if (label) lines.push(`• <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`);
+    });
+    parsePipeFields(cf2).forEach(({ label, value }) => {
+      if (label) lines.push(`• <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`);
+    });
+    parsePipeFields(cf3).forEach(({ label, value }) => {
+      if (label) lines.push(`• <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`);
+    });
+    return { title: '👕 Baju', body: lines.join('\n') };
+  }
+
+  if (orderId.startsWith('SKET-')) {
+    return { title: '📚 Sketchbook', body: '' };
+  }
+
+  if (orderId.startsWith('BOOK-')) {
+    const items = Array.isArray(notification.item_details) ? notification.item_details : [];
+    const productLines = items
+      .filter((item) => item.id !== 'shipping')
+      .map((item) => `• <b>${escapeHtml(item.name)}</b> × ${item.quantity || 1}`);
+    return {
+      title: '📖 Buku',
+      body: productLines.length ? `<b>📖 Item Pesanan</b>\n${productLines.join('\n')}` : '',
+    };
+  }
+
+  return { title: '📖 Grasp Guide', body: '' };
 };
 
 const sendTelegramNotification = async (orderId, transactionId, notification, code) => {
@@ -424,50 +495,57 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
 
   try {
     const amount = parseFloat(notification.gross_amount).toLocaleString('id-ID');
-    const customerName = escapeMarkdown(`${notification.customer_details?.first_name || ''} ${notification.customer_details?.last_name || ''}`.trim());
-    const customerEmail = escapeMarkdown(notification.customer_details?.email || '-');
-    const customerPhone = escapeMarkdown(notification.customer_details?.phone || '-');
-    const paymentType = escapeMarkdown(notification.payment_type || '-');
-    
-    // Determine product type
-    let productType = 'Produk';
-    let productDetails = '';
-    
-    if (orderId.startsWith('BELAJAR-')) {
-      productType = '🎓 Kelas';
-      const customField1 = escapeMarkdown(notification.custom_field1 || '');
-      const customField2 = escapeMarkdown(notification.custom_field2 || '');
-      const customField3 = escapeMarkdown(notification.custom_field3 || '');
-      productDetails = `\n📋 Detail Kelas:\n${customField1}\n${customField2}\n${customField3}`;
-    } else if (orderId.startsWith('SKET-')) {
-      productType = '📚 Sketchbook';
-    } else {
-      productType = '📖 Grasp Guide';
+    const firstName = notification.customer_details?.first_name || '';
+    const lastName = notification.customer_details?.last_name || '';
+    const customerName = `${firstName} ${lastName}`.trim() || '-';
+    const customerEmail = notification.customer_details?.email || '-';
+    const customerPhone = notification.customer_details?.phone || '-';
+    const paymentType = notification.payment_type || '-';
+    const timestamp = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const { title, body: productBody } = buildProductSection(orderId, notification);
+
+    const sections = [];
+
+    sections.push(`🎉 <b>PEMBAYARAN BERHASIL</b>\n${title}`);
+
+    sections.push(
+      [
+        '<b>💳 Pembayaran</b>',
+        `• <b>Order ID:</b> <code>${escapeHtml(orderId)}</code>`,
+        `• <b>Nominal:</b> Rp ${escapeHtml(amount)}`,
+        `• <b>Kode Akses:</b> <code>${escapeHtml(code)}</code>`,
+        `• <b>Metode:</b> ${escapeHtml(paymentType)}`,
+        `• <b>Status:</b> ✅ LUNAS`,
+      ].join('\n')
+    );
+
+    if (productBody) {
+      sections.push(productBody);
     }
 
-    const message = `
-🎉 *PEMBAYARAN BERHASIL!*
+    sections.push(
+      [
+        '<b>👤 Data Pemesan</b>',
+        `• <b>Nama:</b> ${escapeHtml(customerName)}`,
+        `• <b>Email:</b> ${escapeHtml(customerEmail)}`,
+        `• <b>No HP:</b> ${escapeHtml(customerPhone)}`,
+      ].join('\n')
+    );
 
-${productType}
-━━━━━━━━━━━━━━━━━━━━
-💳 *Order ID:* \`${orderId}\`
-💰 *Nominal:* Rp ${amount}
-🔑 *Kode Akses:* \`${code}\`
-💳 *Metode:* ${paymentType}
-✅ *Status:* LUNAS
-${productDetails}
+    sections.push(`🕒 <i>${escapeHtml(timestamp)} WIB</i>`);
 
-👤 *Data Pemesan:*
-━━━━━━━━━━━━━━━━━━━━
-📛 Nama: ${customerName}
-📧 Email: ${customerEmail}
-📱 No HP: ${customerPhone}
+    const message = sections.join('\n\n');
 
-⏰ ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}
-    `.trim();
-
-    const sendPromises = chatIds.map(chatId => 
-      telegramBot.sendMessage(chatId, message, { parse_mode: 'Markdown' })
+    const sendPromises = chatIds.map(chatId =>
+      telegramBot.sendMessage(chatId, message, { parse_mode: 'HTML', disable_web_page_preview: true })
         .then(() => {
           console.log(`✅ Telegram notification sent to ${chatId} for order ${orderId}`);
         })
@@ -506,6 +584,10 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
       // User wanted to track by BELAJAR- prefix.
       code = orderId;
       isClass = true;
+    } else if (orderId.startsWith('BAJU-')) {
+      code = `BJ-${randomPart}`;
+    } else if (orderId.startsWith('BOOK-')) {
+      code = `BK-${randomPart}`;
     } else {
       code = `GG-${randomPart}`;
     }
