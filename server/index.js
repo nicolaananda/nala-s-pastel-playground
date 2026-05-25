@@ -267,6 +267,8 @@ app.get('/api/shipping/villages', async (req, res) => {
 });
 
 // Calculate shipping cost (proxy ke api.co.id)
+// Frontend kirim weight dalam gram. api.co.id baca weight dalam KG.
+// Konvert: ceil(gram/1000), minimum 1kg.
 app.post('/api/shipping/calculate', async (req, res) => {
   try {
     const { destinationVillageCode, weight } = req.body || {};
@@ -274,10 +276,11 @@ app.post('/api/shipping/calculate', async (req, res) => {
     if (!destinationVillageCode || typeof destinationVillageCode !== 'string') {
       return res.status(400).json({ message: 'destinationVillageCode required' });
     }
-    const w = parseInt(weight, 10);
-    if (!w || w <= 0) {
+    const grams = parseInt(weight, 10);
+    if (!grams || grams <= 0) {
       return res.status(400).json({ message: 'weight must be a positive integer (grams)' });
     }
+    const weightKg = Math.max(1, Math.ceil(grams / 1000));
 
     const headers = apiCoIdHeaders();
     if (!headers) {
@@ -287,14 +290,14 @@ app.post('/api/shipping/calculate', async (req, res) => {
     const url = new URL(`${API_CO_ID_BASE}/expedition/shipping-cost`);
     url.searchParams.set('origin_village_code', ORIGIN_VILLAGE_CODE);
     url.searchParams.set('destination_village_code', destinationVillageCode);
-    url.searchParams.set('weight', String(w));
+    url.searchParams.set('weight', String(weightKg));
 
     const response = await axios.get(url.toString(), { headers, timeout: 15000 });
     const couriers = Array.isArray(response.data?.data?.couriers) ? response.data.data.couriers : [];
 
-    // Filter kurir dengan harga > 0 dan harga wajar (< Rp 1jt untuk paket < 5kg)
+    // Filter kurir dengan harga > 0 (semua harga sekarang masuk akal karena konversi kg sudah benar)
     const costs = couriers
-      .filter((c) => Number(c.price) > 0 && Number(c.price) < 1_000_000)
+      .filter((c) => Number(c.price) > 0)
       .map((c) => ({
         courierCode: c.courier_code,
         courierName: c.courier_name,
