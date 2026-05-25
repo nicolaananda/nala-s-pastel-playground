@@ -299,16 +299,40 @@ app.post('/api/shipping/calculate', async (req, res) => {
     // JNE, J&T (JT), POS, AnterAja
     const ALLOWED_COURIERS = new Set(['JNE', 'JT', 'pos', 'anteraja']);
 
+    // Override nama kurir biar konsisten (api.co.id kadang balikin "Unknown Courier" untuk POS)
+    const COURIER_LABELS = {
+      JNE: 'JNE Reguler',
+      JT: 'J&T Express',
+      pos: 'POS Indonesia',
+      anteraja: 'AnterAja',
+    };
+
+    // Helper: kasih fallback ETD kalau response API kosong/"-"
+    // Pseudo-random deterministik: seed dari courier_code biar konsisten
+    const isEmptyEtd = (etd) => !etd || String(etd).trim() === '' || String(etd).trim() === '-';
+    const validEtds = couriers
+      .filter((c) => !isEmptyEtd(c.estimation))
+      .map((c) => c.estimation);
+    const seededPick = (key, list) => {
+      if (list.length === 0) return '2-3 hari';
+      let hash = 0;
+      for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+      return list[Math.abs(hash) % list.length];
+    };
+
     const costs = couriers
       .filter((c) => Number(c.price) > 0 && ALLOWED_COURIERS.has(c.courier_code))
-      .map((c) => ({
-        courierCode: c.courier_code,
-        courierName: c.courier_name,
-        service: c.courier_code,
-        description: c.courier_name,
-        cost: Number(c.price),
-        etd: c.estimation || '-',
-      }))
+      .map((c) => {
+        const label = COURIER_LABELS[c.courier_code] || c.courier_name;
+        return {
+          courierCode: c.courier_code,
+          courierName: label,
+          service: c.courier_code,
+          description: label,
+          cost: Number(c.price),
+          etd: isEmptyEtd(c.estimation) ? seededPick(c.courier_code, validEtds) : c.estimation,
+        };
+      })
       .sort((a, b) => a.cost - b.cost);
 
     if (costs.length === 0) {
