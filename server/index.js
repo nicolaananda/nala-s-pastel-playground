@@ -295,9 +295,12 @@ app.post('/api/shipping/calculate', async (req, res) => {
     const response = await axios.get(url.toString(), { headers, timeout: 15000 });
     const couriers = Array.isArray(response.data?.data?.couriers) ? response.data.data.couriers : [];
 
-    // Filter kurir dengan harga > 0 (semua harga sekarang masuk akal karena konversi kg sudah benar)
+    // Whitelist kurir yang available di Tembalang (origin nala):
+    // JNE, J&T (JT), POS, AnterAja
+    const ALLOWED_COURIERS = new Set(['JNE', 'JT', 'pos', 'anteraja']);
+
     const costs = couriers
-      .filter((c) => Number(c.price) > 0)
+      .filter((c) => Number(c.price) > 0 && ALLOWED_COURIERS.has(c.courier_code))
       .map((c) => ({
         courierCode: c.courier_code,
         courierName: c.courier_name,
@@ -323,7 +326,9 @@ function getFallbackShippingCost() {
   return {
     costs: [
       { courierCode: 'JNE', courierName: 'JNE Reguler', service: 'JNE', description: 'JNE Reguler', cost: 20000, etd: '2-3 hari' },
-      { courierCode: 'SiCepat', courierName: 'SiCepat Reguler', service: 'SiCepat', description: 'SiCepat Reguler', cost: 18000, etd: '2-3 hari' },
+      { courierCode: 'JT', courierName: 'J&T Express', service: 'JT', description: 'J&T Express', cost: 18000, etd: '2-3 hari' },
+      { courierCode: 'pos', courierName: 'POS Indonesia', service: 'pos', description: 'POS Indonesia', cost: 17000, etd: '3-5 hari' },
+      { courierCode: 'anteraja', courierName: 'AnterAja', service: 'anteraja', description: 'AnterAja', cost: 19000, etd: '2-3 hari' },
     ],
   };
 }

@@ -86,6 +86,8 @@ const ShirtCheckoutForm = ({
   const subtotal = unitPrice * watchedQuantity;
   const totalAmount = subtotal + selectedShippingCost;
   const totalWeight = DEFAULT_SHIRT_WEIGHT * watchedQuantity;
+  // Backend konvert ke kg (ceil(g/1000)). Refetch hanya saat hasil kg berubah.
+  const weightKg = Math.max(1, Math.ceil(totalWeight / 1000));
 
   const sizeOptions = watchedCategory === "anak" ? SIZES_ANAK : SIZES_DEWASA;
 
@@ -94,11 +96,12 @@ const ShirtCheckoutForm = ({
     setValue("size", "");
   }, [watchedCategory, setValue]);
 
-  // Hitung ongkir saat village atau qty berubah (qty pengaruhi berat)
+  // Hitung ongkir saat village atau berat (kg) berubah
   useEffect(() => {
     if (!village) {
       setShippingOptions([]);
       setSelectedShippingCost(0);
+      setIsLoadingShipping(false);
       setValue("shippingService", "");
       return;
     }
@@ -107,7 +110,7 @@ const ShirtCheckoutForm = ({
     const fetchShipping = async () => {
       setIsLoadingShipping(true);
       try {
-        const response = await calculateShippingCost(village.code, totalWeight);
+        const response = await calculateShippingCost(village.code, weightKg * 1000);
         if (cancelled) return;
         setShippingOptions(response.costs);
         if (response.costs.length > 0) {
@@ -128,7 +131,7 @@ const ShirtCheckoutForm = ({
     return () => {
       cancelled = true;
     };
-  }, [village, totalWeight, setValue]);
+  }, [village, weightKg, setValue]);
 
   const handleShippingServiceChange = (service: string) => {
     setValue("shippingService", service);

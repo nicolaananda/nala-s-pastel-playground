@@ -66,6 +66,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
     if (!village) {
       setShippingOptions([]);
       setSelectedShippingCost(0);
+      setIsLoadingShipping(false);
       setValue("shippingService", "");
       return;
     }
