@@ -19,8 +19,8 @@ import { calculateShippingCost, ShippingResponse, ShippingCost } from "@/lib/shi
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-const SIZES_ANAK = ["XS", "S", "M", "L", "XL"] as const;
-const SIZES_DEWASA = ["S", "M", "L", "XL", "XXL"] as const;
+const SIZES_ANAK = ["0 (0-2th)", "1 (3-5th)", "2 (6-8th)", "3 (9-10th)"] as const;
+const SIZES_DEWASA = ["XS", "S", "M", "L", "XL", "2XL", "3XL"] as const;
 
 const shirtCheckoutSchema = z.object({
   category: z.enum(["anak", "dewasa"]),

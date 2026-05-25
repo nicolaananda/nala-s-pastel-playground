@@ -31,6 +31,23 @@ const SHIRT = {
 
 type SizeCategory = "anak" | "dewasa" | null;
 
+const SIZE_CHART_ANAK = [
+  { size: "0", age: "0–2 thn", dimension: "31 × 46 cm" },
+  { size: "1", age: "3–5 thn", dimension: "34 × 48 cm" },
+  { size: "2", age: "6–8 thn", dimension: "38 × 51 cm" },
+  { size: "3", age: "9–10 thn", dimension: "43 × 54 cm" },
+];
+
+const SIZE_CHART_DEWASA = [
+  { size: "XS", dimension: "46 × 66 cm" },
+  { size: "S", dimension: "48 × 68 cm" },
+  { size: "M", dimension: "50 × 70 cm" },
+  { size: "L", dimension: "52 × 72 cm" },
+  { size: "XL", dimension: "54 × 74 cm" },
+  { size: "2XL", dimension: "56 × 76 cm" },
+  { size: "3XL", dimension: "58 × 78 cm" },
+];
+
 const Merchandise = () => {
   const [isOrderOpen, setIsOrderOpen] = useState(false);
   const [sizeCategory, setSizeCategory] = useState<SizeCategory>(null);
@@ -95,14 +112,14 @@ const Merchandise = () => {
                   <p className="text-lg sm:text-xl font-bold text-primary">
                     Rp {SHIRT.priceAnak.toLocaleString("id-ID")}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">XS – XL</p>
+                  <p className="text-[10px] text-muted-foreground">Size 0 – 3 (0-10th)</p>
                 </div>
                 <div className="rounded-xl border-2 border-primary/20 bg-blue-50 p-3 text-center">
                   <p className="text-xs text-muted-foreground">Dewasa</p>
                   <p className="text-lg sm:text-xl font-bold text-primary">
                     Rp {SHIRT.priceDewasa.toLocaleString("id-ID")}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">S – XXL</p>
+                  <p className="text-[10px] text-muted-foreground">XS – 3XL</p>
                 </div>
               </div>
 
@@ -192,6 +209,57 @@ const Merchandise = () => {
               </picture>
             )}
           </div>
+
+          {/* Tabel teks (selalu tampil) */}
+          {sizeCategory === "anak" && (
+            <div className="rounded-2xl border-2 border-primary/10 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-primary/10 text-foreground">
+                  <tr>
+                    <th className="text-left p-3 font-semibold">Size</th>
+                    <th className="text-left p-3 font-semibold">Usia</th>
+                    <th className="text-left p-3 font-semibold">Lebar × Panjang</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SIZE_CHART_ANAK.map((row) => (
+                    <tr key={row.size} className="odd:bg-muted/20">
+                      <td className="p-3 font-bold text-primary">{row.size}</td>
+                      <td className="p-3">{row.age}</td>
+                      <td className="p-3">{row.dimension}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="px-3 py-2 text-xs text-muted-foreground bg-muted/20 border-t border-primary/10">
+                Toleransi ukuran: selisih 1–2 cm.
+              </p>
+            </div>
+          )}
+
+          {sizeCategory === "dewasa" && (
+            <div className="rounded-2xl border-2 border-primary/10 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-primary/10 text-foreground">
+                  <tr>
+                    <th className="text-left p-3 font-semibold">Size</th>
+                    <th className="text-left p-3 font-semibold">Lebar × Panjang</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {SIZE_CHART_DEWASA.map((row) => (
+                    <tr key={row.size} className="odd:bg-muted/20">
+                      <td className="p-3 font-bold text-primary">{row.size}</td>
+                      <td className="p-3">{row.dimension}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="px-3 py-2 text-xs text-muted-foreground bg-muted/20 border-t border-primary/10">
+                Toleransi ukuran: selisih 1–2 cm.
+              </p>
+            </div>
+          )}
           <Button
             onClick={() => {
               setSizeCategory(null);
