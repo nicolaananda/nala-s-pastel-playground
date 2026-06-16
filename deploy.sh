@@ -11,7 +11,5 @@ sudo mv ./dist /home/artstudionala.com/public_html
 sudo chown -R www-data:www-data /home/artstudionala.com/public_html
 sudo chmod -R 755 /home/artstudionala.com/public_html
 
-echo "🔄 Reloading nginx..."
-sudo nginx -t && sudo systemctl reload nginx
 
 echo "✅ Deployment complete!"
