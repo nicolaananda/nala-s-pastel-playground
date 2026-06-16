@@ -1,4 +1,5 @@
 import GraspGuide from "./GraspGuide";
+import GraspSixtyColorGuide from "./GraspSixtyColorGuide";
 import SketchGuide from "./SketchGuide";
 
 const DigitalProducts = () => {
@@ -12,9 +13,10 @@ const DigitalProducts = () => {
                     </h2>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
+                <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
                     <GraspGuide />
                     <SketchGuide />
+                    <GraspSixtyColorGuide />
                 </div>
             </div>
         </section>

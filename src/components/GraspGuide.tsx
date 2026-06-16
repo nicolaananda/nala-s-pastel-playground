@@ -28,13 +28,25 @@ const GUIDE_PRICE = 5000;
 const ACCESS_CODE_KEY = "graspGuideAccessCode";
 const SESSION_UNLOCK_KEY = "graspGuideSessionAuthorized";
 
+type GraspGuideProps = {
+  productTitle?: string;
+  productDescription?: string;
+  productClassName?: string;
+  priceLabel?: string;
+};
+
 type SnapResult = {
   transaction_id?: string;
   order_id?: string;
   [key: string]: unknown;
 };
 
-const GraspGuide = () => {
+const GraspGuide = ({
+  productTitle = "Panduan Nama Grasp",
+  productDescription = "Bayar sekali untuk akses panduan nomor & warna Grasp plus kode eksklusif menuju halaman premium.",
+  productClassName = "Panduan Nama Grasp",
+  priceLabel = "Investasi Sekali, Akses Selamanya",
+}: GraspGuideProps) => {
   useMidtransSnap();
   const navigate = useNavigate();
 
@@ -126,7 +138,7 @@ const GraspGuide = () => {
     try {
       const paymentResponse = await createMidtransClassPaymentLink({
         classId: "GRASP_GUIDE_DIGITAL",
-        className: "Nama & Nomor Grasp Isi 60 Warna",
+        className: productClassName,
         price: GUIDE_PRICE,
         customerDetails: {
           firstName: formData.firstName,
@@ -296,15 +308,15 @@ const GraspGuide = () => {
       <Card className="border-2 border-border rounded-2xl sm:rounded-3xl shadow-soft hover:shadow-hover transition-smooth overflow-hidden">
         <div className="h-3 sm:h-4 gradient-pink-blue" />
         <CardHeader className="text-center p-4 sm:p-6">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">🧸 Nama & Nomor Grasp Isi 60 Warna</h2>
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">🧸 {productTitle}</h2>
           <CardDescription className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-            Jual nama nomor Grasp isi 60 warna, lengkap dengan contoh swatch dan file referensi premium.
+            {productDescription}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-4 sm:p-6 pt-0">
           <div className="bg-gradient-pink-blue rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center">
             <p className="text-sm uppercase tracking-[0.2em] font-semibold text-muted text-primary-foreground/80">
-              Akses Sekali Beli
+              {priceLabel}
             </p>
             <p className="text-3xl sm:text-4xl font-bold text-foreground mt-2">Rp {GUIDE_PRICE.toLocaleString("id-ID")}</p>
           </div>
