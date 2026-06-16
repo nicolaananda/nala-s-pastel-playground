@@ -126,7 +126,7 @@ const GraspGuide = () => {
     try {
       const paymentResponse = await createMidtransClassPaymentLink({
         classId: "GRASP_GUIDE_DIGITAL",
-        className: "Panduan Nama Grasp",
+        className: "Nama & Nomor Grasp Isi 60 Warna",
         price: GUIDE_PRICE,
         customerDetails: {
           firstName: formData.firstName,
@@ -296,15 +296,15 @@ const GraspGuide = () => {
       <Card className="border-2 border-border rounded-2xl sm:rounded-3xl shadow-soft hover:shadow-hover transition-smooth overflow-hidden">
         <div className="h-3 sm:h-4 gradient-pink-blue" />
         <CardHeader className="text-center p-4 sm:p-6">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">🧸 Panduan Nama Grasp</h2>
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">🧸 Nama & Nomor Grasp Isi 60 Warna</h2>
           <CardDescription className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-            Bayar sekali untuk akses panduan nomor & warna Grasp plus kode eksklusif menuju halaman premium.
+            Jual nama nomor Grasp isi 60 warna, lengkap dengan contoh swatch dan file referensi premium.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6 p-4 sm:p-6 pt-0">
           <div className="bg-gradient-pink-blue rounded-xl sm:rounded-2xl p-4 sm:p-6 text-center">
             <p className="text-sm uppercase tracking-[0.2em] font-semibold text-muted text-primary-foreground/80">
-              Investasi Sekali, Akses Selamanya
+              Akses Sekali Beli
             </p>
             <p className="text-3xl sm:text-4xl font-bold text-foreground mt-2">Rp {GUIDE_PRICE.toLocaleString("id-ID")}</p>
           </div>

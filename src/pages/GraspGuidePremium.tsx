@@ -3,21 +3,27 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import GuideImage from "@/assets/Guide.png";
-import Image1 from "@/assets/Image1.jpeg";
-import Image2 from "@/assets/Image2.jpeg";
-import Image3 from "@/assets/Image3.jpeg";
-import Image4 from "@/assets/Image4.png";
 
 const ACCESS_CODE_KEY = "graspGuideAccessCode";
 const SESSION_UNLOCK_KEY = "graspGuideSessionAuthorized";
+const GRASP_ASSET_BASE_URL = (import.meta.env.VITE_GRASP_ASSET_BASE_URL || "https://r2.artstudionala.com/grasp").replace(/\/$/, "");
 
 const premiumAssets = [
-  { src: GuideImage, title: "Panduan Nama Lengkap" },
-  { src: Image1, title: "Sheet Panduan 1" },
-  { src: Image2, title: "Sheet Panduan 2" },
-  { src: Image3, title: "Sheet Panduan 3" },
-  { src: Image4, title: "Sheet Panduan 4" },
+  {
+    src: `${GRASP_ASSET_BASE_URL}/grasp_silky_crayon-60warna.jpeg`,
+    title: "Contoh Swatch Nama & Nomor Grasp 60 Warna",
+    type: "image",
+  },
+  {
+    src: `${GRASP_ASSET_BASE_URL}/PDF%20GRASP%20NAMA%20NOMOR%2060%20WARNA.pdf`,
+    title: "PDF Grasp Nama Nomor 60 Warna",
+    type: "pdf",
+  },
+  {
+    src: `${GRASP_ASSET_BASE_URL}/grispy.jpg`,
+    title: "Grispy Grasp",
+    type: "image",
+  },
 ];
 
 const GraspGuidePremium = () => {
@@ -55,9 +61,9 @@ const GraspGuidePremium = () => {
       <div className="container mx-auto max-w-5xl space-y-10">
         <div className="flex flex-col gap-4 text-center">
           <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Halaman Premium</p>
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Panduan Nama + Warna Grasp</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Nama & Nomor Grasp Isi 60 Warna</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Gunakan referensi visual ini untuk mencocokkan warna crayon Grasp sesuai nomor resmi. Simpan akses ini baik-baik.
+            Gunakan swatch, PDF, dan referensi visual ini untuk mencocokkan warna Grasp sesuai nama serta nomor resmi. Simpan akses ini baik-baik.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button variant="outline" onClick={() => navigate("/")}>
@@ -107,7 +113,18 @@ const GraspGuidePremium = () => {
               className="rounded-3xl border border-border bg-card shadow-soft overflow-hidden cursor-zoom-in transition hover:shadow-hover"
               onClick={() => setPreviewAsset(asset)}
             >
-              <img src={asset.src} alt={asset.title} className="w-full h-auto object-cover" loading="lazy" />
+              {asset.type === "pdf" ? (
+                <div className="aspect-[4/3] bg-muted/50">
+                  <iframe
+                    src={asset.src}
+                    title={asset.title}
+                    className="h-full w-full border-0"
+                    loading="lazy"
+                  />
+                </div>
+              ) : (
+                <img src={asset.src} alt={asset.title} className="w-full h-auto object-cover" loading="lazy" />
+              )}
               <figcaption className="p-4 text-center font-semibold text-foreground">{asset.title}</figcaption>
             </figure>
           ))}
@@ -120,7 +137,22 @@ const GraspGuidePremium = () => {
             <DialogTitle>{previewAsset?.title ?? "Pratinjau Gambar"}</DialogTitle>
             <DialogDescription>Gunakan gerakan pinch atau scroll untuk memperbesar detail.</DialogDescription>
           </DialogHeader>
-          {previewAsset && (
+          {previewAsset && previewAsset.type === "pdf" ? (
+            <div className="space-y-4">
+              <div className="h-[75vh] w-full overflow-hidden rounded-2xl border border-border bg-muted/50">
+                <iframe
+                  src={previewAsset.src}
+                  title={previewAsset.title}
+                  className="h-full w-full border-0"
+                />
+              </div>
+              <Button asChild>
+                <a href={previewAsset.src} target="_blank" rel="noreferrer">
+                  Buka PDF di Tab Baru
+                </a>
+              </Button>
+            </div>
+          ) : previewAsset ? (
             <div className="w-full">
               <img
                 src={previewAsset.src}
@@ -129,7 +161,7 @@ const GraspGuidePremium = () => {
                 loading="lazy"
               />
             </div>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </main >
@@ -137,4 +169,3 @@ const GraspGuidePremium = () => {
 };
 
 export default GraspGuidePremium;
-
