@@ -591,7 +591,11 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
     let isClass = false;
 
     // Determine code prefix based on order ID
-    if (orderId.startsWith('SKET-')) {
+    if (orderId.startsWith('G60-')) {
+      code = `G60-${randomPart}`;
+    } else if (orderId.startsWith('GRASP-')) {
+      code = `GG-${randomPart}`;
+    } else if (orderId.startsWith('SKET-')) {
       code = `SK-${randomPart}`;
     } else if (orderId.startsWith('BELAJAR-')) {
       // For classes, we use the Order ID itself as the code (or generate a specific one if needed)
@@ -809,4 +813,3 @@ const startServer = async () => {
 };
 
 startServer();
-

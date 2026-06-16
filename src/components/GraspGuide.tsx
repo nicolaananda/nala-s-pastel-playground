@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,6 +33,14 @@ type GraspGuideProps = {
   productDescription?: string;
   productClassName?: string;
   priceLabel?: string;
+  coverImageUrl?: string;
+  orderPrefix?: string;
+  requiredCodePrefix?: string;
+  allowedCodePrefixes?: string[];
+  accessCodeKey?: string;
+  sessionUnlockKey?: string;
+  premiumPath?: string;
+  codePlaceholder?: string;
 };
 
 type SnapResult = {
@@ -46,6 +54,14 @@ const GraspGuide = ({
   productDescription = "Bayar sekali untuk akses panduan nomor & warna Grasp plus kode eksklusif menuju halaman premium.",
   productClassName = "Panduan Nama Grasp",
   priceLabel = "Investasi Sekali, Akses Selamanya",
+  coverImageUrl,
+  orderPrefix = "GRASP",
+  requiredCodePrefix = "GG-",
+  allowedCodePrefixes = [requiredCodePrefix],
+  accessCodeKey = ACCESS_CODE_KEY,
+  sessionUnlockKey = SESSION_UNLOCK_KEY,
+  premiumPath = "/grasp-guide-premium",
+  codePlaceholder = "Contoh: GG-ABC123",
 }: GraspGuideProps) => {
   useMidtransSnap();
   const navigate = useNavigate();
@@ -67,11 +83,11 @@ const GraspGuide = ({
     if (typeof window === "undefined") {
       return;
     }
-    const savedCode = window.localStorage.getItem(ACCESS_CODE_KEY);
+    const savedCode = window.localStorage.getItem(accessCodeKey);
     if (savedCode) {
       setStoredCode(savedCode);
     }
-  }, []);
+  }, [accessCodeKey]);
 
   const handleInputChange = (field: keyof typeof formData) => (event: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [field]: event.target.value }));
@@ -98,7 +114,7 @@ const GraspGuide = ({
   const handleSuccessfulUnlock = async (code: string, result?: SnapResult) => {
     setGeneratedCode(code);
     setStoredCode(code);
-    window.localStorage.setItem(ACCESS_CODE_KEY, code);
+    window.localStorage.setItem(accessCodeKey, code);
     setEnteredCode(code);
 
     if (result?.transaction_id && result?.order_id) {
@@ -120,7 +136,7 @@ const GraspGuide = ({
       }
     }
 
-    window.sessionStorage.setItem(SESSION_UNLOCK_KEY, "true");
+    window.sessionStorage.setItem(sessionUnlockKey, "true");
     setIsDialogOpen(false);
     toast.success("Pembayaran berhasil! Kode akses diterapkan otomatis.");
     navigate("/grasp-guide-premium");
@@ -140,6 +156,7 @@ const GraspGuide = ({
         classId: "GRASP_GUIDE_DIGITAL",
         className: productClassName,
         price: GUIDE_PRICE,
+        orderPrefix,
         customerDetails: {
           firstName: formData.firstName,
           lastName: formData.lastName,
@@ -279,22 +296,16 @@ const GraspGuide = ({
         return;
       }
 
-      // Determine which premium page to navigate to based on code prefix
-      let premiumPage = "/grasp-guide-premium";
-      let storageKey = ACCESS_CODE_KEY;
-      let sessionKey = SESSION_UNLOCK_KEY;
-
-      if (codeToCheck.startsWith("SK-")) {
-        premiumPage = "/sketch-premium";
-        storageKey = "sketchAccessCode";
-        sessionKey = "sketchSessionAuthorized";
+      if (!allowedCodePrefixes.some((prefix) => codeToCheck.startsWith(prefix))) {
+        toast.error(`Kode ini bukan untuk ${productTitle}. Gunakan kode ${requiredCodePrefix}...`);
+        return;
       }
 
-      window.localStorage.setItem(storageKey, codeToCheck);
-      window.sessionStorage.setItem(sessionKey, "true");
+      window.localStorage.setItem(accessCodeKey, codeToCheck);
+      window.sessionStorage.setItem(sessionUnlockKey, "true");
       setStoredCode(codeToCheck);
       toast.success("Kode valid! Membuka halaman premium.");
-      navigate(premiumPage);
+      navigate(premiumPath);
     } catch (error) {
       console.error("Verify access code error:", error);
       toast.error(error instanceof Error ? error.message : "Gagal memeriksa kode akses.");
@@ -308,6 +319,14 @@ const GraspGuide = ({
       <Card className="border-2 border-border rounded-2xl sm:rounded-3xl shadow-soft hover:shadow-hover transition-smooth overflow-hidden">
         <div className="h-3 sm:h-4 gradient-pink-blue" />
         <CardHeader className="text-center p-4 sm:p-6">
+          {coverImageUrl ? (
+            <img
+              src={coverImageUrl}
+              alt={`Cover ${productTitle}`}
+              className="mb-4 aspect-[4/3] w-full rounded-2xl object-cover shadow-soft"
+              loading="lazy"
+            />
+          ) : null}
           <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">🧸 {productTitle}</h2>
           <CardDescription className="text-sm sm:text-base text-muted-foreground leading-relaxed">
             {productDescription}
@@ -340,7 +359,7 @@ const GraspGuide = ({
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
               <Input
-                placeholder="Contoh: GG-ABC123 atau SK-ABC123"
+                placeholder={codePlaceholder}
                 value={enteredCode}
                 onChange={(event) => setEnteredCode(event.target.value)}
               />

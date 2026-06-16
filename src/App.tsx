@@ -9,6 +9,7 @@ const BookDetail = lazy(() => import("./pages/BookDetail"));
 const CompetitionNews = lazy(() => import("./pages/CompetitionNews"));
 const CompetitionArticleDetail = lazy(() => import("./pages/CompetitionArticleDetail"));
 const GraspGuidePremium = lazy(() => import("./pages/GraspGuidePremium"));
+const GraspSixtyColorPremium = lazy(() => import("./pages/GraspSixtyColorPremium"));
 const SketchPurchase = lazy(() => import("./pages/SketchPurchase"));
 const SketchPremium = lazy(() => import("./pages/SketchPremium"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/berita-lomba" element={<CompetitionNews />} />
           <Route path="/berita-lomba/:articleId" element={<CompetitionArticleDetail />} />
           <Route path="/grasp-guide-premium" element={<GraspGuidePremium />} />
+          <Route path="/grasp-sixty-color-premium" element={<GraspSixtyColorPremium />} />
           <Route path="/sketch-purchase" element={<SketchPurchase />} />
           <Route path="/sketch-premium" element={<SketchPremium />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

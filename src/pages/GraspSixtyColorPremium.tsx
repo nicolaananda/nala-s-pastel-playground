@@ -4,17 +4,29 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-const ACCESS_CODE_KEY = "graspGuideAccessCode";
-const SESSION_UNLOCK_KEY = "graspGuideSessionAuthorized";
+const ACCESS_CODE_KEY = "graspSixtyColorAccessCode";
+const SESSION_UNLOCK_KEY = "graspSixtyColorSessionAuthorized";
+const GRASP_ASSET_BASE_URL = (import.meta.env.VITE_GRASP_ASSET_BASE_URL || "https://r2.artstudionala.com/grasp").replace(/\/$/, "");
+
 const premiumAssets = [
   {
-    src: "https://www.youtube.com/embed/U6GRQyS0fZU",
-    title: "Video Panduan Nama Grasp",
-    type: "video",
+    src: `${GRASP_ASSET_BASE_URL}/grispy.jpg`,
+    title: "Cover Nama & Nomor Grasp Isi 60 Warna",
+    type: "image",
+  },
+  {
+    src: `${GRASP_ASSET_BASE_URL}/grasp_silky_crayon-60warna.jpeg`,
+    title: "Contoh Swatch Nama & Nomor Grasp 60 Warna",
+    type: "image",
+  },
+  {
+    src: `${GRASP_ASSET_BASE_URL}/PDF%20GRASP%20NAMA%20NOMOR%2060%20WARNA.pdf`,
+    title: "PDF Grasp Nama Nomor 60 Warna",
+    type: "pdf",
   },
 ];
 
-const GraspGuidePremium = () => {
+const GraspSixtyColorPremium = () => {
   const navigate = useNavigate();
   const [savedCode, setSavedCode] = useState<string | null>(null);
   const [previewAsset, setPreviewAsset] = useState<(typeof premiumAssets)[number] | null>(null);
@@ -25,7 +37,7 @@ const GraspGuidePremium = () => {
     }
     const isAuthorized = window.sessionStorage.getItem(SESSION_UNLOCK_KEY) === "true";
     if (!isAuthorized) {
-      toast.error("Kode akses tidak ditemukan. Masukkan kode melalui halaman utama.");
+      toast.error("Kode akses 60 warna tidak ditemukan. Masukkan kode G60 melalui halaman utama.");
       navigate("/", { replace: true });
       return;
     }
@@ -40,7 +52,7 @@ const GraspGuidePremium = () => {
     if (typeof window !== "undefined") {
       window.sessionStorage.removeItem(SESSION_UNLOCK_KEY);
     }
-    toast("Konten premium dikunci kembali.");
+    toast("Konten 60 warna dikunci kembali.");
     navigate("/");
   };
 
@@ -48,35 +60,29 @@ const GraspGuidePremium = () => {
     <main className="min-h-screen bg-background py-12 sm:py-16 md:py-20 px-4 sm:px-6">
       <div className="container mx-auto max-w-5xl space-y-10">
         <div className="flex flex-col gap-4 text-center">
-          <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Halaman Premium</p>
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Panduan Nama Grasp</h1>
+          <p className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Halaman Premium 60 Warna</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Nama & Nomor Grasp Isi 60 Warna</h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Gunakan panduan ini untuk memahami nama Grasp dan cara membaca referensi warnanya. Konten 60 warna punya akses terpisah.
+            Gunakan swatch, PDF, dan referensi visual ini untuk mencocokkan warna Grasp sesuai nama serta nomor resmi.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button variant="outline" onClick={() => navigate("/")}>
-              Kembali ke Beranda
-            </Button>
-            <Button variant="secondary" onClick={handleLockContent}>
-              Kunci Konten
-            </Button>
+            <Button variant="outline" onClick={() => navigate("/")}>Kembali ke Beranda</Button>
+            <Button variant="secondary" onClick={handleLockContent}>Kunci Konten</Button>
           </div>
           <div className="mx-auto mt-4 max-w-md text-sm text-muted-foreground space-y-2">
             {savedCode ? (
               <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 px-6 py-4 text-center">
                 <p className="uppercase tracking-[0.3em] text-xs text-primary/80">Kode Akses Kamu</p>
                 <p className="text-2xl font-mono font-bold text-primary mt-2">{savedCode}</p>
-                <p>Screenshoot atau catat kode ini supaya bisa dipakai di perangkat lain.</p>
+                <p>Screenshot atau catat kode ini supaya bisa dipakai di perangkat lain.</p>
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-border bg-muted/40 px-6 py-4 text-center">
-                <p>Kamu sudah unlock konten. Jika butuh kode lagi, buka halaman utama dan masukkan ulang kode aksesmu.</p>
+                <p>Kamu sudah unlock konten 60 warna. Jika butuh kode lagi, buka halaman utama dan masukkan ulang kode aksesmu.</p>
               </div>
             )}
           </div>
         </div>
-
-
 
         <div className="grid gap-6 md:grid-cols-2">
           {premiumAssets.map((asset) => (
@@ -85,24 +91,9 @@ const GraspGuidePremium = () => {
               className="rounded-3xl border border-border bg-card shadow-soft overflow-hidden cursor-zoom-in transition hover:shadow-hover"
               onClick={() => setPreviewAsset(asset)}
             >
-              {asset.type === "video" ? (
-                <div className="relative h-0 pb-[56.25%]">
-                  <iframe
-                    src={asset.src}
-                    title={asset.title}
-                    className="absolute left-0 top-0 h-full w-full border-0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                </div>
-              ) : asset.type === "pdf" ? (
+              {asset.type === "pdf" ? (
                 <div className="aspect-[4/3] bg-muted/50">
-                  <iframe
-                    src={asset.src}
-                    title={asset.title}
-                    className="h-full w-full border-0"
-                    loading="lazy"
-                  />
+                  <iframe src={asset.src} title={asset.title} className="h-full w-full border-0" loading="lazy" />
                 </div>
               ) : (
                 <img src={asset.src} alt={asset.title} className="w-full h-auto object-cover" loading="lazy" />
@@ -119,45 +110,24 @@ const GraspGuidePremium = () => {
             <DialogTitle>{previewAsset?.title ?? "Pratinjau Gambar"}</DialogTitle>
             <DialogDescription>Gunakan gerakan pinch atau scroll untuk memperbesar detail.</DialogDescription>
           </DialogHeader>
-          {previewAsset && previewAsset.type === "video" ? (
-            <div className="relative h-0 pb-[56.25%] rounded-2xl overflow-hidden border border-border bg-muted/50">
-              <iframe
-                src={previewAsset.src}
-                title={previewAsset.title}
-                className="absolute left-0 top-0 h-full w-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          ) : previewAsset && previewAsset.type === "pdf" ? (
+          {previewAsset && previewAsset.type === "pdf" ? (
             <div className="space-y-4">
               <div className="h-[75vh] w-full overflow-hidden rounded-2xl border border-border bg-muted/50">
-                <iframe
-                  src={previewAsset.src}
-                  title={previewAsset.title}
-                  className="h-full w-full border-0"
-                />
+                <iframe src={previewAsset.src} title={previewAsset.title} className="h-full w-full border-0" />
               </div>
               <Button asChild>
-                <a href={previewAsset.src} target="_blank" rel="noreferrer">
-                  Buka PDF di Tab Baru
-                </a>
+                <a href={previewAsset.src} target="_blank" rel="noreferrer">Buka PDF di Tab Baru</a>
               </Button>
             </div>
           ) : previewAsset ? (
             <div className="w-full">
-              <img
-                src={previewAsset.src}
-                alt={previewAsset.title}
-                className="w-full h-full max-h-[80vh] object-contain rounded-2xl"
-                loading="lazy"
-              />
+              <img src={previewAsset.src} alt={previewAsset.title} className="w-full h-full max-h-[80vh] object-contain rounded-2xl" loading="lazy" />
             </div>
           ) : null}
         </DialogContent>
       </Dialog>
-    </main >
+    </main>
   );
 };
 
-export default GraspGuidePremium;
+export default GraspSixtyColorPremium;

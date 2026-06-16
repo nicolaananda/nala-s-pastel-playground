@@ -151,6 +151,7 @@ export interface MidtransClassPaymentRequest {
   classId: string;
   className: string;
   price: number;
+  orderPrefix?: string;
   customerDetails: {
     firstName: string;
     lastName: string;
@@ -170,8 +171,8 @@ export interface MidtransClassPaymentRequest {
 export const createMidtransClassPaymentLink = async (
   request: MidtransClassPaymentRequest
 ): Promise<MidtransPaymentResponse> => {
-  // Use BELAJAR- prefix as requested
-  const orderId = `BELAJAR-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+  const orderPrefix = request.orderPrefix || "BELAJAR";
+  const orderId = `${orderPrefix}-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
   // Prepare request body for backend API
   const requestBody = {
@@ -478,4 +479,3 @@ export const verifyGraspGuideAccessCode = async (
 
   return response.json();
 };
-
