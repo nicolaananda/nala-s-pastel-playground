@@ -42,7 +42,7 @@ const fallbackBooks = [
 const cmsBookToCard = (item: ContentItem) => ({
   id: item.slug,
   title: item.title,
-  description: item.description,
+  description: String(item.metadata?.shortDescription || item.description.split("\n\n")[0] || "").slice(0, 180),
   image: item.imageUrl || fallbackBooks[0].image,
   imageFallback: item.imageUrl || fallbackBooks[0].imageFallback,
   price: item.price || 0,
@@ -112,7 +112,7 @@ const BestSellerBooks = () => {
                   <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300">
                     {book.title}
                   </CardTitle>
-                  <CardDescription className="text-sm sm:text-base text-muted-foreground mt-2">
+                  <CardDescription className="text-sm sm:text-base text-muted-foreground mt-2 line-clamp-4">
                     {book.description}
                   </CardDescription>
                 </CardHeader>

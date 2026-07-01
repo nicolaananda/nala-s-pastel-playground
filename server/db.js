@@ -33,7 +33,10 @@ Mewarnai objek dan background menjadi hal yang penting dalam lomba mewarnai. Dal
 
 Sambil berlatih, anak bisa belajar melengkapi gambar untuk kategori TK dan SD serta tema-tema yang sering dilombakan sepanjang tahun dengan QR Code video tutorial.`,
     price: 110000,
-    metadata: { gradient: 'gradient-pink' },
+    metadata: {
+      gradient: 'gradient-pink',
+      shortDescription: 'Buku pedoman lengkap untuk persiapan lomba mewarnai dengan tips, teknik, latihan, dan QR Code video tutorial.',
+    },
     sortOrder: 1,
   },
   {
@@ -54,7 +57,10 @@ Sambil berlatih, anak bisa belajar melengkapi gambar untuk kategori TK dan SD se
 
 5. Dilengkapi papan board di bagian belakang yang berfungsi sebagai alas dan menjaga kestabilan saat mewarnai.`,
     price: 85000,
-    metadata: { gradient: 'gradient-pink-blue' },
+    metadata: {
+      gradient: 'gradient-pink-blue',
+      shortDescription: '30 gambar sketsa anime eksklusif dengan tips profesional untuk mewarnai mata, rambut, dan wajah karakter anime.',
+    },
     sortOrder: 2,
   },
   {
@@ -73,7 +79,10 @@ Sambil berlatih, anak bisa belajar melengkapi gambar untuk kategori TK dan SD se
 
 4. Terdapat 6 video tutorial mewarnai yang menarik dan dapat discan melalui QR Code.`,
     price: 85000,
-    metadata: { gradient: 'gradient-blue' },
+    metadata: {
+      gradient: 'gradient-blue',
+      shortDescription: '37 gambar sketsa tematik sepanjang tahun untuk latihan dan persiapan lomba mewarnai, dilengkapi video tutorial.',
+    },
     sortOrder: 3,
   },
   {
