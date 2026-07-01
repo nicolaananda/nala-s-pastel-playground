@@ -34,8 +34,12 @@ export interface AccessRecord {
   revokedReason?: string | null;
 }
 
-const requestJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(url, {
+const apiBase = () => import.meta.env.VITE_API_URL || "";
+
+const apiUrl = (path: string) => `${apiBase()}${path}`;
+
+const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(apiUrl(path), {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     ...init,
