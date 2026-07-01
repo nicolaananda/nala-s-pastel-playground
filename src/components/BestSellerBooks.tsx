@@ -1,16 +1,15 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// @ts-ignore - vite-imagetools handles this
+import { ContentItem, fetchPublicContent } from "@/lib/cms";
 import book1Image from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg?w=600&format=webp&quality=85";
 import book1ImageFallback from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg";
-// @ts-ignore - vite-imagetools handles this
 import book2Image from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg?w=600&format=webp&quality=85";
 import book2ImageFallback from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg";
-// @ts-ignore - vite-imagetools handles this
 import book3Image from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg?w=600&format=webp&quality=85";
 import book3ImageFallback from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg";
 
-const books = [
+const fallbackBooks = [
   {
     id: "tips-trik-juara-1-lomba-mewarnai",
     title: "Tips & Trick Juara 1 Lomba Mewarnai",
@@ -26,7 +25,7 @@ const books = [
     description: "30 gambar sketsa anime eksklusif dengan tips & trik profesional untuk mewarnai mata, rambut, dan wajah karakter anime. Dilengkapi video tutorial untuk setiap gambar.",
     image: book2Image,
     imageFallback: book2ImageFallback,
-    price: 79000,
+    price: 85000,
     gradient: "gradient-pink-blue"
   },
   {
@@ -35,10 +34,20 @@ const books = [
     description: "37 gambar sketsa tematik sepanjang tahun dengan tema hari besar, kebudayaan, dan anak. Dilengkapi 6 video tutorial mewarnai yang dapat diakses via QR Code.",
     image: book3Image,
     imageFallback: book3ImageFallback,
-    price: 79000,
+    price: 85000,
     gradient: "gradient-blue"
   }
 ];
+
+const cmsBookToCard = (item: ContentItem) => ({
+  id: item.slug,
+  title: item.title,
+  description: item.description,
+  image: item.imageUrl || fallbackBooks[0].image,
+  imageFallback: item.imageUrl || fallbackBooks[0].imageFallback,
+  price: item.price || 0,
+  gradient: String(item.metadata?.gradient || "gradient-pink"),
+});
 
 const getGradientClass = (gradient: string) => {
   switch (gradient) {
@@ -54,6 +63,16 @@ const getGradientClass = (gradient: string) => {
 };
 
 const BestSellerBooks = () => {
+  const [books, setBooks] = useState(fallbackBooks);
+
+  useEffect(() => {
+    fetchPublicContent("book")
+      .then((items) => {
+        if (items.length) setBooks(items.map(cmsBookToCard));
+      })
+      .catch(() => setBooks(fallbackBooks));
+  }, []);
+
   return (
     <section id="buku-best-seller" className="py-12 sm:py-16 md:py-20 px-4 sm:px-6 bg-gradient-to-br from-background via-muted/30 to-accent/20">
       <div className="container mx-auto max-w-6xl">

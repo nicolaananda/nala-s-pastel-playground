@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fetchPublicContent } from "@/lib/cms";
 
 const ACCESS_CODE_KEY = "graspSixtyColorAccessCode";
 const SESSION_UNLOCK_KEY = "graspSixtyColorSessionAuthorized";
 const GRASP_ASSET_BASE_URL = (import.meta.env.VITE_GRASP_ASSET_BASE_URL || "https://r2.artstudionala.com/grasp").replace(/\/$/, "");
 
-const premiumAssets = [
+const fallbackPremiumAssets = [
   {
     src: `${GRASP_ASSET_BASE_URL}/grispy.jpg`,
     title: "Cover Nama & Nomor Grasp Isi 60 Warna",
@@ -26,10 +27,13 @@ const premiumAssets = [
   },
 ];
 
+type PremiumAsset = (typeof fallbackPremiumAssets)[number];
+
 const GraspSixtyColorPremium = () => {
   const navigate = useNavigate();
   const [savedCode, setSavedCode] = useState<string | null>(null);
-  const [previewAsset, setPreviewAsset] = useState<(typeof premiumAssets)[number] | null>(null);
+  const [premiumAssets, setPremiumAssets] = useState<PremiumAsset[]>(fallbackPremiumAssets);
+  const [previewAsset, setPreviewAsset] = useState<PremiumAsset | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -47,6 +51,22 @@ const GraspSixtyColorPremium = () => {
       setSavedCode(localCode);
     }
   }, [navigate]);
+
+  useEffect(() => {
+    fetchPublicContent("grasp_asset")
+      .then((items) => {
+        const mapped = items
+          .filter((item) => item.metadata?.accessGroup === "grasp-60-color" || item.slug.includes("60"))
+          .map((item) => ({
+            src: item.fileUrl || item.imageUrl || "",
+            title: item.title,
+            type: item.metadata?.assetType === "pdf" ? "pdf" : "image",
+          }))
+          .filter((item) => item.src);
+        if (mapped.length) setPremiumAssets(mapped as PremiumAsset[]);
+      })
+      .catch(() => setPremiumAssets(fallbackPremiumAssets));
+  }, []);
 
   const handleLockContent = () => {
     if (typeof window !== "undefined") {

@@ -1,16 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
 import CheckoutForm from "@/components/CheckoutForm";
-// @ts-ignore - vite-imagetools handles this
+import { ContentItem, fetchPublicContentItem } from "@/lib/cms";
 import book1Image from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg?w=800&format=webp&quality=85";
 import book1ImageFallback from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg";
-// @ts-ignore - vite-imagetools handles this
 import book2Image from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg?w=800&format=webp&quality=85";
 import book2ImageFallback from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg";
-// @ts-ignore - vite-imagetools handles this
 import book3Image from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg?w=800&format=webp&quality=85";
 import book3ImageFallback from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg";
 
@@ -27,7 +25,7 @@ const getGradientClass = (bookId: string) => {
   }
 };
 
-const books = {
+const fallbackBooks = {
   "tips-trik-juara-1-lomba-mewarnai": {
     title: "Tips & Trick Juara 1 Lomba Mewarnai",
     image: book1Image,
@@ -55,7 +53,7 @@ Seringkali lembar saat lomba mewarnai memiliki sedikit objek didalamnya. Menamba
     title: "LET'S COLORING YOUR ANIME!",
     image: book2Image,
     imageFallback: book2ImageFallback,
-    price: 79000,
+    price: 85000,
     description: `Temukan pengalaman mewarnai karakter anime yang seru dan edukatif! Buku ini berisi 30 gambar sketsa anime eksklusif yang siap kamu warnai, lengkap dengan tips dan trik profesional untuk menggambar dan mewarnai mata, rambut, serta wajah karakter anime.
 
 **Keunggulan Buku**
@@ -74,7 +72,7 @@ Seringkali lembar saat lomba mewarnai memiliki sedikit objek didalamnya. Menamba
     title: "COLORING WORKSHEET JUARA 1 LOMBA MEWARNAI",
     image: book3Image,
     imageFallback: book3ImageFallback,
-    price: 79000,
+    price: 85000,
     description: `Buku worksheet mewarnai dengan 37 gambar sketsa tematik sepanjang tahun yang dirancang khusus untuk latihan dan persiapan lomba mewarnai.
 
 **Keunggulan Buku**
@@ -89,10 +87,33 @@ Seringkali lembar saat lomba mewarnai memiliki sedikit objek didalamnya. Menamba
   }
 };
 
+type BookView = {
+  title: string;
+  image: string;
+  imageFallback: string;
+  price: number;
+  description: string;
+};
+
+const cmsBookToView = (item: ContentItem): BookView => ({
+  title: item.title,
+  image: item.imageUrl || book1Image,
+  imageFallback: item.imageUrl || book1ImageFallback,
+  price: item.price || 0,
+  description: item.description,
+});
+
 const BookDetail = () => {
   const { bookId } = useParams<{ bookId: string }>();
-  const book = bookId ? books[bookId as keyof typeof books] : null;
+  const [book, setBook] = useState<BookView | null>(bookId ? fallbackBooks[bookId as keyof typeof fallbackBooks] || null : null);
   const [showCheckout, setShowCheckout] = useState(false);
+
+  useEffect(() => {
+    if (!bookId) return;
+    fetchPublicContentItem("book", bookId)
+      .then((item) => setBook(cmsBookToView(item)))
+      .catch(() => setBook(fallbackBooks[bookId as keyof typeof fallbackBooks] || null));
+  }, [bookId]);
 
   if (!book) {
     return (
@@ -201,4 +222,3 @@ const BookDetail = () => {
 };
 
 export default BookDetail;
-

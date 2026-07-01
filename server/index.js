@@ -6,6 +6,7 @@ import axios from 'axios';
 import { db, initDatabase } from './db.js';
 import TelegramBot from 'node-telegram-bot-api';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
@@ -36,10 +37,96 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 const normalizeCode = (code = '') =>
   code.trim().toUpperCase();
+
+const ADMIN_COOKIE_NAME = 'nala_admin_session';
+const ADMIN_SESSION_TTL_MS = 1000 * 60 * 60 * 8;
+const adminEmail = process.env.ADMIN_EMAIL || 'admin@artstudionala.com';
+const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH || '';
+const adminPassword = process.env.ADMIN_PASSWORD || '';
+const adminSecret = process.env.JWT_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.MIDTRANS_SERVER_KEY || 'dev-admin-secret-change-me';
+
+const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+
+const parseCookies = (cookieHeader = '') => Object.fromEntries(
+  cookieHeader
+    .split(';')
+    .map((cookie) => cookie.trim())
+    .filter(Boolean)
+    .map((cookie) => {
+      const [name, ...rest] = cookie.split('=');
+      return [name, decodeURIComponent(rest.join('='))];
+    })
+);
+
+const signSession = (payload) => {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', adminSecret).update(body).digest('base64url');
+  return `${body}.${signature}`;
+};
+
+const verifySession = (token) => {
+  if (!token || !token.includes('.')) return null;
+  const [body, signature] = token.split('.');
+  const expected = crypto.createHmac('sha256', adminSecret).update(body).digest('base64url');
+  if (signature.length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+  const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+  if (!payload.email || !payload.expiresAt || Date.now() > payload.expiresAt) return null;
+  return payload;
+};
+
+const isAdminPasswordValid = (password) => {
+  if (!password) return false;
+  if (adminPasswordHash) return sha256(password) === adminPasswordHash;
+  return Boolean(adminPassword) && password.length === adminPassword.length && crypto.timingSafeEqual(Buffer.from(password), Buffer.from(adminPassword));
+};
+
+const setAdminCookie = (res, token) => {
+  res.cookie(ADMIN_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: ADMIN_SESSION_TTL_MS,
+    path: '/',
+  });
+};
+
+const requireAdmin = (req, res, next) => {
+  const cookies = parseCookies(req.headers.cookie || '');
+  const session = verifySession(cookies[ADMIN_COOKIE_NAME]);
+  if (!session || session.email !== adminEmail) {
+    return res.status(401).json({ message: 'Admin login required' });
+  }
+  req.admin = { email: session.email };
+  next();
+};
+
+const parseMetadata = (metadata) => {
+  if (!metadata) return {};
+  if (typeof metadata === 'object') return metadata;
+  try {
+    return JSON.parse(metadata);
+  } catch {
+    return {};
+  }
+};
+
+const normalizeContentInput = (body) => ({
+  type: String(body.type || '').trim(),
+  slug: String(body.slug || '').trim(),
+  title: String(body.title || '').trim(),
+  description: String(body.description || ''),
+  price: body.price === '' || body.price === null || body.price === undefined ? null : Number(body.price),
+  imageUrl: String(body.imageUrl || '').trim(),
+  fileUrl: String(body.fileUrl || '').trim(),
+  metadata: parseMetadata(body.metadata),
+  status: ['draft', 'published', 'archived'].includes(body.status) ? body.status : 'draft',
+  sortOrder: Number(body.sortOrder || 0),
+});
 
 // Initialize Midtrans Snap
 const snap = new midtransClient.Snap({
@@ -51,6 +138,118 @@ const snap = new midtransClient.Snap({
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API is running' });
+});
+
+app.get('/api/content/:type', async (req, res) => {
+  try {
+    const items = await db.getPublicContent(req.params.type);
+    res.json({ items });
+  } catch (error) {
+    console.error('Get public content error:', error);
+    res.status(500).json({ message: 'Failed to fetch content', error: error.message });
+  }
+});
+
+app.get('/api/content/:type/:slug', async (req, res) => {
+  try {
+    const item = await db.getPublicContentBySlug(req.params.type, req.params.slug);
+    if (!item) return res.status(404).json({ message: 'Content not found' });
+    res.json({ item });
+  } catch (error) {
+    console.error('Get public content item error:', error);
+    res.status(500).json({ message: 'Failed to fetch content item', error: error.message });
+  }
+});
+
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (email !== adminEmail || !isAdminPasswordValid(password)) {
+      return res.status(401).json({ message: 'Email atau password admin salah' });
+    }
+    const token = signSession({ email, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS });
+    setAdminCookie(res, token);
+    await db.logAdminAction({ adminEmail: email, action: 'login', entityType: 'admin_session', details: { email } });
+    res.json({ admin: { email } });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ message: 'Failed to login', error: error.message });
+  }
+});
+
+app.post('/api/admin/logout', requireAdmin, async (req, res) => {
+  res.clearCookie(ADMIN_COOKIE_NAME, { path: '/' });
+  await db.logAdminAction({ adminEmail: req.admin.email, action: 'logout', entityType: 'admin_session' });
+  res.json({ success: true });
+});
+
+app.get('/api/admin/me', requireAdmin, (req, res) => {
+  res.json({ admin: req.admin });
+});
+
+app.get('/api/admin/content', requireAdmin, async (req, res) => {
+  try {
+    const items = await db.getAdminContent(req.query.type);
+    res.json({ items });
+  } catch (error) {
+    console.error('Get admin content error:', error);
+    res.status(500).json({ message: 'Failed to fetch admin content', error: error.message });
+  }
+});
+
+app.post('/api/admin/content', requireAdmin, async (req, res) => {
+  try {
+    const item = normalizeContentInput(req.body);
+    if (!item.type || !item.slug || !item.title) {
+      return res.status(400).json({ message: 'type, slug, and title are required' });
+    }
+    const saved = await db.createContentItem(item);
+    await db.logAdminAction({ adminEmail: req.admin.email, action: 'create', entityType: 'content_item', entityId: String(saved.id), details: saved });
+    res.status(201).json({ item: saved });
+  } catch (error) {
+    console.error('Create content error:', error);
+    res.status(500).json({ message: 'Failed to create content', error: error.message });
+  }
+});
+
+app.put('/api/admin/content/:id', requireAdmin, async (req, res) => {
+  try {
+    const item = normalizeContentInput(req.body);
+    if (!item.type || !item.slug || !item.title) {
+      return res.status(400).json({ message: 'type, slug, and title are required' });
+    }
+    const saved = await db.updateContentItem(req.params.id, item);
+    if (!saved) return res.status(404).json({ message: 'Content not found' });
+    await db.logAdminAction({ adminEmail: req.admin.email, action: 'update', entityType: 'content_item', entityId: String(saved.id), details: saved });
+    res.json({ item: saved });
+  } catch (error) {
+    console.error('Update content error:', error);
+    res.status(500).json({ message: 'Failed to update content', error: error.message });
+  }
+});
+
+app.delete('/api/admin/content/:id', requireAdmin, async (req, res) => {
+  try {
+    const saved = await db.archiveContentItem(req.params.id);
+    if (!saved) return res.status(404).json({ message: 'Content not found' });
+    await db.logAdminAction({ adminEmail: req.admin.email, action: 'archive', entityType: 'content_item', entityId: String(saved.id), details: saved });
+    res.json({ item: saved });
+  } catch (error) {
+    console.error('Archive content error:', error);
+    res.status(500).json({ message: 'Failed to archive content', error: error.message });
+  }
+});
+
+app.post('/api/admin/uploads', requireAdmin, async (req, res) => {
+  const { url, title, type } = req.body;
+  if (!url) return res.status(400).json({ message: 'url is required until R2 upload credentials are configured' });
+  await db.logAdminAction({ adminEmail: req.admin.email, action: 'register_upload', entityType: 'upload', details: { url, title, type } });
+  res.json({ upload: { url, title: title || '', type: type || 'external-url' } });
+});
+
+app.get('/api/admin/audit-logs', requireAdmin, async (req, res) => {
+  const logs = await db.getAuditLogs();
+  res.json({ logs });
 });
 
 // Debug endpoint to check Midtrans configuration
@@ -199,10 +398,10 @@ app.post('/api/grasp-guide/verify-code', async (req, res) => {
     const normalized = normalizeCode(code);
     const row = await db.findCodeByCode(normalized);
 
-    if (!row) {
+    if (!row || row.revoked_at) {
       return res.status(404).json({
         valid: false,
-        message: 'Kode tidak ditemukan',
+        message: row?.revoked_at ? 'Kode sudah dinonaktifkan' : 'Kode tidak ditemukan',
       });
     }
 
@@ -729,7 +928,7 @@ app.get('/api/transaction/:orderId/code', async (req, res) => {
 });
 
 // Generate missing code for a transaction (manual fix for missing codes)
-app.post('/api/transaction/:orderId/generate-code', async (req, res) => {
+app.post('/api/transaction/:orderId/generate-code', requireAdmin, async (req, res) => {
   try {
     const { orderId } = req.params;
     const { transactionId, customer } = req.body;
@@ -758,6 +957,13 @@ app.post('/api/transaction/:orderId/generate-code', async (req, res) => {
     });
 
     console.log(`✅ Manually generated code ${code} for order ${orderId}`);
+    await db.logAdminAction({
+      adminEmail: req.admin.email,
+      action: 'generate_access_code',
+      entityType: 'grasp_guide_access',
+      entityId: row.code,
+      details: db.rowToJson(row),
+    });
 
     res.json({
       success: true,
@@ -775,7 +981,7 @@ app.post('/api/transaction/:orderId/generate-code', async (req, res) => {
 });
 
 // List all transactions (for debugging/admin)
-app.get('/api/admin/transactions', async (req, res) => {
+app.get('/api/admin/transactions', requireAdmin, async (req, res) => {
   try {
     const rows = await db.getAllAccessCodes();
     const records = rows.map(row => db.rowToJson(row));
@@ -783,6 +989,30 @@ app.get('/api/admin/transactions', async (req, res) => {
   } catch (error) {
     console.error('Get transactions error:', error);
     res.status(500).json({ message: 'Failed to fetch transactions', error: error.message });
+  }
+});
+
+app.post('/api/admin/access-codes/:code/revoke', requireAdmin, async (req, res) => {
+  try {
+    const row = await db.revokeAccessCode(req.params.code, req.body.reason);
+    if (!row) return res.status(404).json({ message: 'Code not found' });
+    await db.logAdminAction({ adminEmail: req.admin.email, action: 'revoke_access_code', entityType: 'grasp_guide_access', entityId: row.code, details: db.rowToJson(row) });
+    res.json({ record: db.rowToJson(row) });
+  } catch (error) {
+    console.error('Revoke code error:', error);
+    res.status(500).json({ message: 'Failed to revoke code', error: error.message });
+  }
+});
+
+app.post('/api/admin/access-codes/:code/restore', requireAdmin, async (req, res) => {
+  try {
+    const row = await db.restoreAccessCode(req.params.code);
+    if (!row) return res.status(404).json({ message: 'Code not found' });
+    await db.logAdminAction({ adminEmail: req.admin.email, action: 'restore_access_code', entityType: 'grasp_guide_access', entityId: row.code, details: db.rowToJson(row) });
+    res.json({ record: db.rowToJson(row) });
+  } catch (error) {
+    console.error('Restore code error:', error);
+    res.status(500).json({ message: 'Failed to restore code', error: error.message });
   }
 });
 

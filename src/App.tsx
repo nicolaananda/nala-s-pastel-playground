@@ -12,6 +12,8 @@ const GraspGuidePremium = lazy(() => import("./pages/GraspGuidePremium"));
 const GraspSixtyColorPremium = lazy(() => import("./pages/GraspSixtyColorPremium"));
 const SketchPurchase = lazy(() => import("./pages/SketchPurchase"));
 const SketchPremium = lazy(() => import("./pages/SketchPremium"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const PageFallback = (
@@ -35,6 +37,8 @@ const App = () => (
           <Route path="/grasp-sixty-color-premium" element={<GraspSixtyColorPremium />} />
           <Route path="/sketch-purchase" element={<SketchPurchase />} />
           <Route path="/sketch-premium" element={<SketchPremium />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

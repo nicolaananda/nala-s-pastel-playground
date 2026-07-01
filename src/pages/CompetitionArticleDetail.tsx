@@ -1,12 +1,30 @@
 import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
 import { competitionArticles } from "@/data/competitionArticles";
 import { Calendar, MapPin, Trophy } from "lucide-react";
+import { fetchPublicContentItem } from "@/lib/cms";
 
 const CompetitionArticleDetail = () => {
   const { articleId } = useParams<{ articleId: string }>();
-  const article = competitionArticles.find(a => a.id === articleId);
+  const [article, setArticle] = useState(competitionArticles.find(a => a.id === articleId) || null);
+
+  useEffect(() => {
+    if (!articleId) return;
+    fetchPublicContentItem("article", articleId)
+      .then((item) => setArticle({
+        id: item.slug,
+        title: item.title,
+        date: String(item.metadata?.displayDate || item.createdAt || ""),
+        location: String(item.metadata?.location || ""),
+        photos: item.imageUrl ? [{ src: item.imageUrl, srcFallback: item.imageUrl, alt: item.title }] : [],
+        content: item.description,
+        winners: Array.isArray(item.metadata?.winners) ? item.metadata.winners : [],
+        featured: Boolean(item.metadata?.featured),
+      }))
+      .catch(() => setArticle(competitionArticles.find(a => a.id === articleId) || null));
+  }, [articleId]);
 
   if (!article) {
     return (
@@ -158,4 +176,3 @@ const CompetitionArticleDetail = () => {
 };
 
 export default CompetitionArticleDetail;
-

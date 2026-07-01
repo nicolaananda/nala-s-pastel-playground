@@ -1,12 +1,34 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
 import { competitionArticles } from "@/data/competitionArticles";
 import { Calendar, MapPin } from "lucide-react";
+import { fetchPublicContent } from "@/lib/cms";
 
 const CompetitionNews = () => {
+  const [articles, setArticles] = useState(competitionArticles);
+
+  useEffect(() => {
+    fetchPublicContent("article")
+      .then((items) => {
+        if (!items.length) return;
+        setArticles(items.map((item) => ({
+          id: item.slug,
+          title: item.title,
+          date: String(item.metadata?.displayDate || item.createdAt || ""),
+          location: String(item.metadata?.location || ""),
+          photos: item.imageUrl ? [{ src: item.imageUrl, srcFallback: item.imageUrl, alt: item.title }] : [],
+          content: item.description,
+          winners: Array.isArray(item.metadata?.winners) ? item.metadata.winners : [],
+          featured: Boolean(item.metadata?.featured),
+        })));
+      })
+      .catch(() => setArticles(competitionArticles));
+  }, []);
+
   // Sort articles by date (newest first)
-  const sortedArticles = [...competitionArticles].sort((a, b) => {
+  const sortedArticles = [...articles].sort((a, b) => {
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
@@ -135,4 +157,3 @@ const CompetitionNews = () => {
 };
 
 export default CompetitionNews;
-

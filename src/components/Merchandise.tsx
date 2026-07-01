@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,20 +9,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import ShirtCheckoutForm from "@/components/ShirtCheckoutForm";
-// @ts-ignore - vite-imagetools handles this
+import { fetchPublicContent } from "@/lib/cms";
 import shirtImg from "@/assets/desain_baju.jpeg?w=600&format=webp&quality=80";
 import shirtImgFallback from "@/assets/desain_baju.jpeg";
-// @ts-ignore - vite-imagetools handles this
 import shirtSampleImg from "@/assets/desain_size.jpeg?w=600&format=webp&quality=80";
 import shirtSampleImgFallback from "@/assets/desain_size.jpeg";
-// @ts-ignore - vite-imagetools handles this
 import sizeAnakImg from "@/assets/size_anak.jpeg?w=900&format=webp&quality=85";
 import sizeAnakImgFallback from "@/assets/size_anak.jpeg";
-// @ts-ignore - vite-imagetools handles this
 import sizeDewasaImg from "@/assets/size_dewasa.jpeg?w=900&format=webp&quality=85";
 import sizeDewasaImgFallback from "@/assets/size_dewasa.jpeg";
 
-const SHIRT = {
+const FALLBACK_SHIRT = {
   id: "baju-nala",
   title: "Baju Artstudio Nala",
   priceAnak: 60000,
@@ -52,6 +49,22 @@ const Merchandise = () => {
   const [isOrderOpen, setIsOrderOpen] = useState(false);
   const [sizeCategory, setSizeCategory] = useState<SizeCategory>(null);
   const [isSampleOpen, setIsSampleOpen] = useState(false);
+  const [shirt, setShirt] = useState(FALLBACK_SHIRT);
+
+  useEffect(() => {
+    fetchPublicContent("merchandise")
+      .then((items) => {
+        const item = items[0];
+        if (!item) return;
+        setShirt({
+          id: item.slug,
+          title: item.title,
+          priceAnak: Number(item.metadata?.priceAnak || item.price || FALLBACK_SHIRT.priceAnak),
+          priceDewasa: Number(item.metadata?.priceDewasa || item.price || FALLBACK_SHIRT.priceDewasa),
+        });
+      })
+      .catch(() => setShirt(FALLBACK_SHIRT));
+  }, []);
 
   const handlePaymentSuccess = (paymentUrl: string) => {
     setIsOrderOpen(false);
@@ -100,7 +113,7 @@ const Merchandise = () => {
             {/* Info — 3/5 */}
             <CardContent className="sm:col-span-3 p-5 sm:p-6 md:p-8">
               <h3 className="text-xl sm:text-2xl font-bold text-foreground mb-2">
-                {SHIRT.title}
+                {shirt.title}
               </h3>
               <p className="text-sm text-muted-foreground mb-4">
                 Baju eksklusif Artstudio Nala untuk anak maupun dewasa.
@@ -110,14 +123,14 @@ const Merchandise = () => {
                 <div className="rounded-xl border-2 border-primary/20 bg-pink-50 p-3 text-center">
                   <p className="text-xs text-muted-foreground">Anak</p>
                   <p className="text-lg sm:text-xl font-bold text-primary">
-                    Rp {SHIRT.priceAnak.toLocaleString("id-ID")}
+                    Rp {shirt.priceAnak.toLocaleString("id-ID")}
                   </p>
                   <p className="text-[10px] text-muted-foreground">Size 0 – 3 (0-10th)</p>
                 </div>
                 <div className="rounded-xl border-2 border-primary/20 bg-blue-50 p-3 text-center">
                   <p className="text-xs text-muted-foreground">Dewasa</p>
                   <p className="text-lg sm:text-xl font-bold text-primary">
-                    Rp {SHIRT.priceDewasa.toLocaleString("id-ID")}
+                    Rp {shirt.priceDewasa.toLocaleString("id-ID")}
                   </p>
                   <p className="text-[10px] text-muted-foreground">XS – 3XL</p>
                 </div>
@@ -167,10 +180,10 @@ const Merchandise = () => {
             </DialogDescription>
           </DialogHeader>
           <ShirtCheckoutForm
-            shirtId={SHIRT.id}
-            shirtTitle={SHIRT.title}
-            priceAnak={SHIRT.priceAnak}
-            priceDewasa={SHIRT.priceDewasa}
+            shirtId={shirt.id}
+            shirtTitle={shirt.title}
+            priceAnak={shirt.priceAnak}
+            priceDewasa={shirt.priceDewasa}
             onPaymentSuccess={handlePaymentSuccess}
           />
         </DialogContent>
@@ -277,7 +290,7 @@ const Merchandise = () => {
       <Dialog open={isSampleOpen} onOpenChange={setIsSampleOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{SHIRT.title}</DialogTitle>
+            <DialogTitle>{shirt.title}</DialogTitle>
             <DialogDescription>Foto desain & sampel</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
