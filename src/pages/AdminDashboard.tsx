@@ -64,6 +64,8 @@ const AdminDashboard = () => {
   const [uploadUrl, setUploadUrl] = useState("");
 
   const visibleItems = useMemo(() => items.filter((item) => item.type === selectedType), [items, selectedType]);
+  const publishedCount = useMemo(() => items.filter((item) => item.status === "published").length, [items]);
+  const draftCount = useMemo(() => items.filter((item) => item.status === "draft").length, [items]);
 
   const loadAll = async () => {
     const [me, content, transactionData, auditData] = await Promise.all([
@@ -161,29 +163,54 @@ const AdminDashboard = () => {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-accent/20 px-4 py-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Admin CMS Nala</h1>
-            <p className="text-muted-foreground">Login: {adminEmail}</p>
+    <main className="relative min-h-screen overflow-hidden bg-[#fff8ef] px-4 py-6 text-[#2b2118] sm:px-6 lg:px-8">
+      <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-[#ff8db3]/30 blur-3xl" />
+      <div className="pointer-events-none absolute right-0 top-40 h-96 w-96 rounded-full bg-[#ffd36e]/35 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-10 left-1/3 h-80 w-80 rounded-full bg-[#7dd3fc]/25 blur-3xl" />
+      <div className="mx-auto max-w-[1500px] space-y-6">
+        <div className="relative overflow-hidden rounded-[2.5rem] border-2 border-[#2b2118] bg-[#fffdf8]/90 shadow-[10px_10px_0_#2b2118] backdrop-blur">
+          <div className="absolute right-8 top-8 hidden rotate-6 rounded-full border-2 border-[#2b2118] bg-[#ffd36e] px-5 py-2 text-sm font-black uppercase tracking-widest text-[#2b2118] md:block">Studio OS</div>
+          <div className="flex flex-col gap-5 border-b-2 border-[#2b2118] bg-[linear-gradient(135deg,#ff8db3,#ffd36e_48%,#93e7d4)] px-6 py-8 text-[#2b2118] lg:flex-row lg:items-end lg:justify-between">
+            <div className="space-y-2">
+              <p className="text-xs font-black uppercase tracking-[0.45em] text-[#2b2118]/70">Nala Studio Control Room</p>
+              <h1 className="text-4xl font-black tracking-[-0.04em] sm:text-6xl">Content Playground</h1>
+              <p className="max-w-2xl text-base font-semibold text-[#2b2118]/75">Kelola buku, tulisan, premium asset, dan baju seperti meja kerja kreatif—lebih studio, bukan panel admin template.</p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="rounded-3xl border-2 border-[#2b2118] bg-white/70 px-4 py-3 text-sm shadow-[4px_4px_0_#2b2118] backdrop-blur">
+                <p className="text-[#2b2118]/60">Login sebagai</p>
+                <p className="font-semibold">{adminEmail}</p>
+              </div>
+              <Button className="rounded-full border-2 border-[#2b2118] bg-[#2b2118] text-white hover:bg-[#2b2118]/90" onClick={logout}>Logout</Button>
+            </div>
           </div>
-          <Button variant="outline" onClick={logout}>Logout</Button>
+
+          <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-[1.75rem] border-2 border-[#2b2118] bg-white p-5 shadow-[5px_5px_0_#2b2118]"><p className="text-sm font-bold text-[#2b2118]/60">Total Konten</p><p className="mt-2 text-4xl font-black">{items.length}</p></div>
+            <div className="rounded-[1.75rem] border-2 border-[#2b2118] bg-[#b7f7d1] p-5 shadow-[5px_5px_0_#2b2118]"><p className="text-sm font-bold text-[#2b2118]/60">Published</p><p className="mt-2 text-4xl font-black">{publishedCount}</p></div>
+            <div className="rounded-[1.75rem] border-2 border-[#2b2118] bg-[#ffe29a] p-5 shadow-[5px_5px_0_#2b2118]"><p className="text-sm font-bold text-[#2b2118]/60">Draft</p><p className="mt-2 text-4xl font-black">{draftCount}</p></div>
+            <div className="rounded-[1.75rem] border-2 border-[#2b2118] bg-[#ffc1d6] p-5 shadow-[5px_5px_0_#2b2118]"><p className="text-sm font-bold text-[#2b2118]/60">Premium Codes</p><p className="mt-2 text-4xl font-black">{transactions.length}</p></div>
+          </div>
         </div>
 
         <Tabs defaultValue="content">
-          <TabsList className="flex h-auto flex-wrap">
+          <TabsList className="sticky top-3 z-10 flex h-auto flex-wrap justify-start rounded-full border-2 border-[#2b2118] bg-white/90 p-2 shadow-[6px_6px_0_#2b2118] backdrop-blur">
             <TabsTrigger value="content">Konten</TabsTrigger>
             <TabsTrigger value="access">Premium Access</TabsTrigger>
             <TabsTrigger value="uploads">Uploads</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="content" className="grid gap-6 lg:grid-cols-[minmax(420px,520px)_1fr]">
-            <Card className="border-2 border-primary/20 bg-gradient-to-br from-card to-primary/5 shadow-hover">
+          <TabsContent value="content" className="mt-6 grid gap-6 xl:grid-cols-[minmax(460px,560px)_1fr]">
+            <Card className="overflow-hidden rounded-[2rem] border-2 border-[#2b2118] bg-[#fffdf8] shadow-[8px_8px_0_#2b2118]">
               <CardHeader>
-                <CardTitle>{formItem.id ? "Edit" : "Tambah"} Konten</CardTitle>
-                <p className="text-sm text-muted-foreground">Isi field utama saja. Bagian teknis disimpan otomatis.</p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-2xl">{formItem.id ? "Edit" : "Tambah"} Konten</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">Isi field utama saja. Bagian teknis disimpan otomatis.</p>
+                  </div>
+                  <span className="rounded-full border-2 border-[#2b2118] bg-[#ffd36e] px-3 py-1 text-xs font-black uppercase tracking-wider text-[#2b2118]">Editor</span>
+                </div>
               </CardHeader>
               <CardContent>
                 <form className="space-y-4" onSubmit={saveItem}>
@@ -276,24 +303,37 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Daftar Konten</CardTitle>
+            <Card className="overflow-hidden rounded-[2rem] border-2 border-[#2b2118] bg-[#fffdf8] shadow-[8px_8px_0_#2b2118]">
+              <CardHeader className="border-b-2 border-[#2b2118] bg-[#93e7d4]/40">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <CardTitle className="text-2xl">Daftar Konten</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">Pilih jenis konten, lalu edit kartu yang ingin diubah.</p>
+                  </div>
                 <Select value={selectedType} onValueChange={(value: ContentType) => { setSelectedType(value); resetForm(value); }}>
-                  <SelectTrigger className="max-w-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="max-w-xs rounded-full"><SelectValue /></SelectTrigger>
                   <SelectContent>{contentTypes.map((type) => <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>)}</SelectContent>
                 </Select>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-3">
                 {visibleItems.map((item) => (
-                  <div key={item.id} className="rounded-2xl border p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div><h3 className="font-bold">{item.title}</h3><p className="text-sm text-muted-foreground">/{item.slug} · {item.status} · sort {item.sortOrder}</p></div>
-                      <div className="flex gap-2"><Button size="sm" onClick={() => editItem(item)}>Edit</Button><Button size="sm" variant="destructive" onClick={() => archiveItem(item)}>Archive</Button></div>
+                  <div key={item.id} className="group flex min-h-56 flex-col justify-between rounded-[1.75rem] border-2 border-[#2b2118] bg-white p-5 shadow-[5px_5px_0_#2b2118] transition hover:-translate-y-1 hover:rotate-[-0.5deg] hover:shadow-[8px_8px_0_#2b2118]">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <span className={`rounded-full px-3 py-1 text-xs font-bold ${item.status === "published" ? "bg-emerald-100 text-emerald-700" : item.status === "draft" ? "bg-amber-100 text-amber-700" : "bg-muted text-muted-foreground"}`}>{item.status}</span>
+                        <span className="text-xs text-muted-foreground">#{item.sortOrder}</span>
+                      </div>
+                      <div>
+                        <h3 className="line-clamp-2 text-lg font-black leading-tight text-foreground group-hover:text-primary">{item.title}</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">/{item.slug}</p>
+                      </div>
+                      <p className="line-clamp-4 text-sm leading-6 text-muted-foreground">{item.metadata?.shortDescription ? String(item.metadata.shortDescription) : item.description}</p>
                     </div>
-                    <p className="mt-2 line-clamp-2 text-sm">{item.description}</p>
+                    <div className="mt-4 flex gap-2 border-t pt-4"><Button size="sm" className="flex-1" onClick={() => editItem(item)}>Edit</Button><Button size="sm" variant="outline" onClick={() => archiveItem(item)}>Archive</Button></div>
                   </div>
                 ))}
+                {visibleItems.length === 0 ? <div className="col-span-full rounded-3xl border border-dashed p-10 text-center text-muted-foreground">Belum ada konten untuk kategori ini.</div> : null}
               </CardContent>
             </Card>
           </TabsContent>
