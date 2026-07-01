@@ -31,7 +31,8 @@ const contentTypes: Array<{ value: ContentType; label: string }> = [
   { value: "merchandise", label: "Baju" },
 ];
 
-type EditorMode = "plain" | "html" | "preview";
+type ContentFormat = "plain" | "html";
+type EditorView = "write" | "preview";
 
 const typeHelp: Record<ContentType, string> = {
   book: "Buku otomatis muncul di section Best Seller dan halaman detail. Harga dipakai checkout.",
@@ -58,7 +59,8 @@ const AdminDashboard = () => {
   const [selectedType, setSelectedType] = useState<ContentType>("book");
   const [formItem, setFormItem] = useState<ContentItem>(emptyItem);
   const [metadataText, setMetadataText] = useState("{}");
-  const [editorMode, setEditorMode] = useState<EditorMode>("plain");
+  const [contentFormat, setContentFormat] = useState<ContentFormat>("plain");
+  const [editorView, setEditorView] = useState<EditorView>("write");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [manualOrderId, setManualOrderId] = useState("");
   const [uploadUrl, setUploadUrl] = useState("");
@@ -87,7 +89,8 @@ const AdminDashboard = () => {
   const resetForm = (type = selectedType) => {
     setFormItem({ ...emptyItem, type });
     setMetadataText("{}");
-    setEditorMode("plain");
+    setContentFormat("plain");
+    setEditorView("write");
     setShowAdvanced(false);
   };
 
@@ -95,7 +98,8 @@ const AdminDashboard = () => {
     setFormItem(item);
     setSelectedType(item.type);
     setMetadataText(JSON.stringify(item.metadata || {}, null, 2));
-    setEditorMode(String(item.metadata?.editorMode || "plain") === "html" ? "html" : "plain");
+    setContentFormat(String(item.metadata?.contentFormat || item.metadata?.editorMode || "plain") === "html" ? "html" : "plain");
+    setEditorView("write");
   };
 
   const updateMetadata = (key: string, value: unknown) => {
@@ -113,8 +117,9 @@ const AdminDashboard = () => {
     }
   };
 
-  const insertMarkup = (before: string, after = "") => {
-    setFormItem((item) => ({ ...item, description: `${item.description}${before}${after}` }));
+  const insertSnippet = (plainSnippet: string, htmlSnippet: string) => {
+    const snippet = contentFormat === "html" ? htmlSnippet : plainSnippet;
+    setFormItem((item) => ({ ...item, description: `${item.description}${item.description ? "\n\n" : ""}${snippet}` }));
   };
 
   const saveItem = async (event: FormEvent) => {
@@ -122,7 +127,8 @@ const AdminDashboard = () => {
     try {
       const metadata = {
         ...JSON.parse(metadataText || "{}"),
-        editorMode,
+        contentFormat,
+        editorMode: contentFormat,
         shortDescription: metadataValue("shortDescription") || clampExcerpt(formItem.description),
       };
       await adminApi.saveContent({ ...formItem, metadata });
@@ -245,23 +251,36 @@ const AdminDashboard = () => {
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <Label>Isi konten</Label>
                       <div className="flex flex-wrap gap-2">
-                        <Button type="button" size="sm" variant={editorMode === "plain" ? "default" : "outline"} onClick={() => { setEditorMode("plain"); updateMetadata("editorMode", "plain"); }}>Plain</Button>
-                        <Button type="button" size="sm" variant={editorMode === "html" ? "default" : "outline"} onClick={() => { setEditorMode("html"); updateMetadata("editorMode", "html"); }}>HTML</Button>
-                        <Button type="button" size="sm" variant={editorMode === "preview" ? "default" : "outline"} onClick={() => setEditorMode("preview")}>Preview</Button>
+                        <Button type="button" size="sm" variant={contentFormat === "plain" ? "default" : "outline"} onClick={() => { setContentFormat("plain"); updateMetadata("contentFormat", "plain"); updateMetadata("editorMode", "plain"); }}>Plain</Button>
+                        <Button type="button" size="sm" variant={contentFormat === "html" ? "default" : "outline"} onClick={() => { setContentFormat("html"); updateMetadata("contentFormat", "html"); updateMetadata("editorMode", "html"); }}>HTML</Button>
+                        <Button type="button" size="sm" variant={editorView === "write" ? "secondary" : "outline"} onClick={() => setEditorView("write")}>Write</Button>
+                        <Button type="button" size="sm" variant={editorView === "preview" ? "secondary" : "outline"} onClick={() => setEditorView("preview")}>Preview</Button>
                       </div>
                     </div>
-                    {editorMode !== "preview" ? (
+                    {editorView === "write" ? (
                       <>
-                        <div className="flex flex-wrap gap-2">
-                          <Button type="button" size="sm" variant="secondary" onClick={() => insertMarkup(editorMode === "html" ? "<h3>Subjudul</h3>" : "\n\n**Subjudul**\n\n")}>Subjudul</Button>
-                          <Button type="button" size="sm" variant="secondary" onClick={() => insertMarkup(editorMode === "html" ? "<strong>Tebal</strong>" : "**Tebal**")}>Bold</Button>
-                          <Button type="button" size="sm" variant="secondary" onClick={() => insertMarkup(editorMode === "html" ? "<ul><li>Poin</li></ul>" : "\n- Poin")}>List</Button>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                          <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("**Subjudul**", "<h3>Subjudul</h3>")}>Subjudul</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("**Teks tebal**", "<strong>Teks tebal</strong>")}>Bold</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("- Poin pertama\n- Poin kedua", "<ul><li>Poin pertama</li><li>Poin kedua</li></ul>")}>Bullet</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("1. Langkah pertama\n2. Langkah kedua", "<ol><li>Langkah pertama</li><li>Langkah kedua</li></ol>")}>Number</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("> Catatan penting", "<blockquote>Catatan penting</blockquote>")}>Quote</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("[Teks link](https://contoh.com)", '<a href="https://contoh.com" target="_blank" rel="noreferrer">Teks link</a>')}>Link</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("---", "<hr />")}>Divider</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("![Alt gambar](https://contoh.com/gambar.jpg)", '<img src="https://contoh.com/gambar.jpg" alt="Alt gambar" />')}>Image</Button>
                         </div>
-                        <Textarea className="min-h-56 font-serif text-base leading-7" value={formItem.description} onChange={(event) => setFormItem({ ...formItem, description: event.target.value })} placeholder={editorMode === "html" ? "<p>Tulis konten HTML di sini...</p>" : "Tulis konten seperti artikel biasa. Pisahkan paragraf dengan enter dua kali."} />
+                        <Textarea className="min-h-64 font-serif text-base leading-7" value={formItem.description} onChange={(event) => setFormItem({ ...formItem, description: event.target.value })} placeholder={contentFormat === "html" ? "<p>Tulis konten HTML di sini...</p>" : "Tulis konten seperti artikel biasa. Pisahkan paragraf dengan enter dua kali."} />
                       </>
                     ) : (
-                      <div className="prose max-w-none rounded-xl bg-white p-4 text-sm leading-7">
-                        {editorMode === "preview" && String(metadataValue("editorMode")) === "html" ? <div dangerouslySetInnerHTML={{ __html: formItem.description }} /> : formItem.description.split("\n\n").map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+                      <div className="prose max-w-none rounded-xl bg-white p-4 text-sm leading-7 shadow-inner">
+                        {contentFormat === "html" ? <div dangerouslySetInnerHTML={{ __html: formItem.description }} /> : formItem.description.split("\n\n").filter(Boolean).map((paragraph, index) => {
+                          if (paragraph.startsWith("**") && paragraph.endsWith("**")) return <h3 key={index}>{paragraph.replace(/\*\*/g, "")}</h3>;
+                          if (paragraph.startsWith("- ")) return <ul key={index}>{paragraph.split("\n").map((line) => <li key={line}>{line.replace(/^- /, "")}</li>)}</ul>;
+                          if (paragraph.startsWith("1. ")) return <ol key={index}>{paragraph.split("\n").map((line) => <li key={line}>{line.replace(/^\d+\. /, "")}</li>)}</ol>;
+                          if (paragraph.startsWith("> ")) return <blockquote key={index}>{paragraph.replace(/^> /, "")}</blockquote>;
+                          if (paragraph === "---") return <hr key={index} />;
+                          return <p key={index}>{paragraph}</p>;
+                        })}
                       </div>
                     )}
                   </div>
