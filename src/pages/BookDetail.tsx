@@ -55,7 +55,7 @@ Seringkali lembar saat lomba mewarnai memiliki sedikit objek didalamnya. Menamba
     title: "LET'S COLORING YOUR ANIME!",
     image: book2Image,
     imageFallback: book2ImageFallback,
-    price: 79000,
+    price: 85000,
     description: `Temukan pengalaman mewarnai karakter anime yang seru dan edukatif! Buku ini berisi 30 gambar sketsa anime eksklusif yang siap kamu warnai, lengkap dengan tips dan trik profesional untuk menggambar dan mewarnai mata, rambut, serta wajah karakter anime.
 
 **Keunggulan Buku**
@@ -74,7 +74,7 @@ Seringkali lembar saat lomba mewarnai memiliki sedikit objek didalamnya. Menamba
     title: "COLORING WORKSHEET JUARA 1 LOMBA MEWARNAI",
     image: book3Image,
     imageFallback: book3ImageFallback,
-    price: 79000,
+    price: 85000,
     description: `Buku worksheet mewarnai dengan 37 gambar sketsa tematik sepanjang tahun yang dirancang khusus untuk latihan dan persiapan lomba mewarnai.
 
 **Keunggulan Buku**

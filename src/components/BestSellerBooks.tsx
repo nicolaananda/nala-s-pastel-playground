@@ -26,7 +26,7 @@ const books = [
     description: "30 gambar sketsa anime eksklusif dengan tips & trik profesional untuk mewarnai mata, rambut, dan wajah karakter anime. Dilengkapi video tutorial untuk setiap gambar.",
     image: book2Image,
     imageFallback: book2ImageFallback,
-    price: 79000,
+    price: 85000,
     gradient: "gradient-pink-blue"
   },
   {
@@ -35,7 +35,7 @@ const books = [
     description: "37 gambar sketsa tematik sepanjang tahun dengan tema hari besar, kebudayaan, dan anak. Dilengkapi 6 video tutorial mewarnai yang dapat diakses via QR Code.",
     image: book3Image,
     imageFallback: book3ImageFallback,
-    price: 79000,
+    price: 85000,
     gradient: "gradient-blue"
   }
 ];
