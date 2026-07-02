@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ const contentTypes: Array<{ value: ContentType; label: string }> = [
 ];
 
 type ContentFormat = "plain" | "html";
-type EditorView = "write" | "preview";
+type EditorView = "visual" | "write" | "preview";
 
 const typeHelp: Record<ContentType, string> = {
   book: "Buku otomatis muncul di section Best Seller dan halaman detail. Harga dipakai checkout.",
@@ -57,6 +57,8 @@ const AdminDashboard = () => {
   const [transactions, setTransactions] = useState<AccessRecord[]>([]);
   const [logs, setLogs] = useState<Array<Record<string, unknown>>>([]);
   const [selectedType, setSelectedType] = useState<ContentType>("book");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | ContentItem["status"]>("all");
   const [formItem, setFormItem] = useState<ContentItem>(emptyItem);
   const [metadataText, setMetadataText] = useState("{}");
   const [contentFormat, setContentFormat] = useState<ContentFormat>("plain");
@@ -65,8 +67,15 @@ const AdminDashboard = () => {
   const [manualOrderId, setManualOrderId] = useState("");
   const [uploadUrl, setUploadUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const visualEditorRef = useRef<HTMLDivElement | null>(null);
 
-  const visibleItems = useMemo(() => items.filter((item) => item.type === selectedType), [items, selectedType]);
+  const visibleItems = useMemo(() => items.filter((item) => {
+    const matchesType = item.type === selectedType;
+    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+    const searchText = `${item.title} ${item.slug} ${item.description}`.toLowerCase();
+    const matchesSearch = !searchQuery || searchText.includes(searchQuery.toLowerCase());
+    return matchesType && matchesStatus && matchesSearch;
+  }), [items, searchQuery, selectedType, statusFilter]);
   const publishedCount = useMemo(() => items.filter((item) => item.status === "published").length, [items]);
   const draftCount = useMemo(() => items.filter((item) => item.status === "draft").length, [items]);
 
@@ -91,7 +100,7 @@ const AdminDashboard = () => {
     setFormItem({ ...emptyItem, type });
     setMetadataText("{}");
     setContentFormat("plain");
-    setEditorView("write");
+    setEditorView("visual");
     setShowAdvanced(false);
   };
 
@@ -100,7 +109,7 @@ const AdminDashboard = () => {
     setSelectedType(item.type);
     setMetadataText(JSON.stringify(item.metadata || {}, null, 2));
     setContentFormat(String(item.metadata?.contentFormat || item.metadata?.editorMode || "plain") === "html" ? "html" : "plain");
-    setEditorView("write");
+    setEditorView(String(item.metadata?.contentFormat || item.metadata?.editorMode || "plain") === "html" ? "visual" : "write");
   };
 
   const updateMetadata = (key: string, value: unknown) => {
@@ -121,6 +130,27 @@ const AdminDashboard = () => {
   const insertSnippet = (plainSnippet: string, htmlSnippet: string) => {
     const snippet = contentFormat === "html" ? htmlSnippet : plainSnippet;
     setFormItem((item) => ({ ...item, description: `${item.description}${item.description ? "\n\n" : ""}${snippet}` }));
+  };
+
+  const runEditorCommand = (command: string, value?: string) => {
+    setContentFormat("html");
+    updateMetadata("contentFormat", "html");
+    updateMetadata("editorMode", "html");
+    visualEditorRef.current?.focus();
+    document.execCommand(command, false, value);
+    if (visualEditorRef.current) {
+      setFormItem((item) => ({ ...item, description: visualEditorRef.current?.innerHTML || item.description }));
+    }
+  };
+
+  const promptLink = () => {
+    const url = window.prompt("Masukkan URL link");
+    if (url) runEditorCommand("createLink", url);
+  };
+
+  const promptImage = () => {
+    const url = window.prompt("Masukkan URL gambar");
+    if (url) runEditorCommand("insertImage", url);
   };
 
   const saveItem = async (event: FormEvent) => {
@@ -271,13 +301,36 @@ const AdminDashboard = () => {
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <Label>Isi konten</Label>
                       <div className="flex flex-wrap gap-2">
-                        <Button type="button" size="sm" variant={contentFormat === "plain" ? "default" : "outline"} onClick={() => { setContentFormat("plain"); updateMetadata("contentFormat", "plain"); updateMetadata("editorMode", "plain"); }}>Plain</Button>
-                        <Button type="button" size="sm" variant={contentFormat === "html" ? "default" : "outline"} onClick={() => { setContentFormat("html"); updateMetadata("contentFormat", "html"); updateMetadata("editorMode", "html"); }}>HTML</Button>
-                        <Button type="button" size="sm" variant={editorView === "write" ? "secondary" : "outline"} onClick={() => setEditorView("write")}>Write</Button>
+                        <Button type="button" size="sm" variant={editorView === "visual" ? "default" : "outline"} onClick={() => { setEditorView("visual"); setContentFormat("html"); updateMetadata("contentFormat", "html"); updateMetadata("editorMode", "html"); }}>Visual</Button>
+                        <Button type="button" size="sm" variant={editorView === "write" && contentFormat === "plain" ? "default" : "outline"} onClick={() => { setEditorView("write"); setContentFormat("plain"); updateMetadata("contentFormat", "plain"); updateMetadata("editorMode", "plain"); }}>Plain</Button>
+                        <Button type="button" size="sm" variant={editorView === "write" && contentFormat === "html" ? "default" : "outline"} onClick={() => { setEditorView("write"); setContentFormat("html"); updateMetadata("contentFormat", "html"); updateMetadata("editorMode", "html"); }}>HTML</Button>
                         <Button type="button" size="sm" variant={editorView === "preview" ? "secondary" : "outline"} onClick={() => setEditorView("preview")}>Preview</Button>
                       </div>
                     </div>
-                    {editorView === "write" ? (
+                    {editorView === "visual" ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                          <Button type="button" size="sm" variant="secondary" onClick={() => runEditorCommand("formatBlock", "h2")}>H2</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => runEditorCommand("formatBlock", "h3")}>H3</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => runEditorCommand("bold")}>Bold</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => runEditorCommand("italic")}>Italic</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => runEditorCommand("underline")}>Underline</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => runEditorCommand("insertUnorderedList")}>Bullet</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => runEditorCommand("insertOrderedList")}>Number</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={promptLink}>Link</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={promptImage}>Image</Button>
+                          <Button type="button" size="sm" variant="secondary" onClick={() => runEditorCommand("removeFormat")}>Clear</Button>
+                        </div>
+                        <div
+                          ref={visualEditorRef}
+                          contentEditable
+                          suppressContentEditableWarning
+                          className="min-h-72 rounded-xl border bg-white p-5 font-serif text-base leading-8 shadow-inner outline-none focus:ring-2 focus:ring-primary/40"
+                          dangerouslySetInnerHTML={{ __html: formItem.description }}
+                          onInput={(event) => setFormItem({ ...formItem, description: event.currentTarget.innerHTML })}
+                        />
+                      </>
+                    ) : editorView === "write" ? (
                       <>
                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                           <Button type="button" size="sm" variant="secondary" onClick={() => insertSnippet("**Subjudul**", "<h3>Subjudul</h3>")}>Subjudul</Button>
