@@ -64,6 +64,7 @@ const AdminDashboard = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [manualOrderId, setManualOrderId] = useState("");
   const [uploadUrl, setUploadUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const visibleItems = useMemo(() => items.filter((item) => item.type === selectedType), [items, selectedType]);
   const publishedCount = useMemo(() => items.filter((item) => item.status === "published").length, [items]);
@@ -161,6 +162,25 @@ const AdminDashboard = () => {
     toast.success("URL asset tercatat di audit log");
     setUploadUrl("");
     await loadAll();
+  };
+
+  const uploadFile = async (file: File, target: "image" | "file" = "image") => {
+    setUploading(true);
+    try {
+      const result = await adminApi.uploadFile(file);
+      if (target === "image") {
+        setFormItem((item) => ({ ...item, imageUrl: result.upload.url }));
+      } else {
+        setFormItem((item) => ({ ...item, fileUrl: result.upload.url }));
+      }
+      setUploadUrl(result.upload.url);
+      toast.success("File berhasil diupload");
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload gagal");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const logout = async () => {
@@ -289,11 +309,25 @@ const AdminDashboard = () => {
                     <div className="space-y-2"><Label>Harga</Label><Input type="number" value={formItem.price ?? ""} onChange={(event) => setFormItem({ ...formItem, price: event.target.value ? Number(event.target.value) : null })} placeholder="85000" /></div>
                     <div className="space-y-2"><Label>Urutan</Label><Input type="number" value={formItem.sortOrder} onChange={(event) => setFormItem({ ...formItem, sortOrder: Number(event.target.value) })} /></div>
                   </div>
-                  <div className="space-y-2"><Label>URL gambar cover</Label><Input value={formItem.imageUrl || ""} onChange={(event) => setFormItem({ ...formItem, imageUrl: event.target.value })} placeholder="https://...jpg" /></div>
-                  <div className="space-y-2"><Label>URL file/PDF/video</Label><Input value={formItem.fileUrl || ""} onChange={(event) => setFormItem({ ...formItem, fileUrl: event.target.value })} placeholder="Kosongkan jika tidak ada" /></div>
+                  <div className="space-y-2 rounded-2xl border p-3">
+                    <Label>Gambar cover</Label>
+                    <Input value={formItem.imageUrl || ""} onChange={(event) => setFormItem({ ...formItem, imageUrl: event.target.value })} placeholder="https://...jpg" />
+                    <Input type="file" accept="image/*" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "image")} />
+                    <p className="text-xs text-muted-foreground">Upload akan masuk ke Cloudflare R2 jika env R2 aktif; paste URL manual juga bisa.</p>
+                  </div>
+                  <div className="space-y-2 rounded-2xl border p-3">
+                    <Label>File / PDF / Video</Label>
+                    <Input value={formItem.fileUrl || ""} onChange={(event) => setFormItem({ ...formItem, fileUrl: event.target.value })} placeholder="Kosongkan jika tidak ada" />
+                    <Input type="file" accept="image/*,.pdf,video/mp4" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "file")} />
+                    <p className="text-xs text-muted-foreground">Cocok untuk PDF premium, swatch, atau gambar tambahan. Maks 10MB.</p>
+                  </div>
 
                   {formItem.type === "book" ? (
                     <div className="space-y-2"><Label>Warna kartu buku</Label><Select value={String(metadataValue("gradient") || "gradient-pink")} onValueChange={(value) => updateMetadata("gradient", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="gradient-pink">Pink Kuning</SelectItem><SelectItem value="gradient-pink-blue">Pink Biru</SelectItem><SelectItem value="gradient-blue">Biru</SelectItem></SelectContent></Select></div>
+                  ) : null}
+
+                  {formItem.type === "article" ? (
+                    <div className="grid grid-cols-2 gap-3 rounded-2xl border p-3"><div className="space-y-2"><Label>Tanggal tampil</Label><Input value={String(metadataValue("displayDate") || "")} onChange={(event) => updateMetadata("displayDate", event.target.value)} placeholder="1 Juli 2026" /></div><div className="space-y-2"><Label>Lokasi</Label><Input value={String(metadataValue("location") || "")} onChange={(event) => updateMetadata("location", event.target.value)} placeholder="Jakarta" /></div></div>
                   ) : null}
 
                   {formItem.type === "merchandise" ? (
@@ -362,7 +396,7 @@ const AdminDashboard = () => {
             <Card><CardHeader><CardTitle>Premium Access Codes</CardTitle></CardHeader><CardContent className="space-y-3">{transactions.map((record) => <div key={`${record.transactionId}-${record.code}`} className="rounded-xl border p-3 text-sm"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><b>{record.code}</b> · {record.orderId} · {record.customer?.email || "no email"}{record.revokedAt ? <span className="ml-2 text-destructive">revoked</span> : null}</div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => adminApi.restoreCode(record.code).then(loadAll)}>Restore</Button><Button size="sm" variant="destructive" onClick={() => adminApi.revokeCode(record.code, "Admin revoke").then(loadAll)}>Revoke</Button></div></div></div>)}</CardContent></Card>
           </TabsContent>
 
-          <TabsContent value="uploads"><Card><CardHeader><CardTitle>Upload / Asset URL</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">R2 direct upload butuh credential server. Untuk sekarang admin bisa register URL asset eksternal/R2 dan pakai URL itu di konten.</p><div className="flex gap-2"><Input placeholder="https://..." value={uploadUrl} onChange={(event) => setUploadUrl(event.target.value)} /><Button onClick={registerUpload}>Catat URL</Button></div></CardContent></Card></TabsContent>
+          <TabsContent value="uploads"><Card><CardHeader><CardTitle>Upload / Asset Library</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-muted-foreground">Upload file dari komputer ke Cloudflare R2. Kalau env R2 belum di-set, local dev fallback ke folder server.</p><div className="rounded-2xl border p-4 space-y-3"><Label>Upload file</Label><Input type="file" accept="image/*,.pdf,video/mp4" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "file")} /><p className="text-xs text-muted-foreground">Allowed: jpg, png, webp, gif, pdf, mp4. Maks 10MB.</p></div><div className="flex gap-2"><Input placeholder="https://..." value={uploadUrl} onChange={(event) => setUploadUrl(event.target.value)} /><Button onClick={registerUpload}>Catat URL</Button></div>{uploadUrl ? <div className="rounded-2xl bg-muted p-3 text-sm break-all">URL terakhir: {uploadUrl}</div> : null}</CardContent></Card></TabsContent>
 
           <TabsContent value="audit"><Card><CardHeader><CardTitle>Audit Log</CardTitle></CardHeader><CardContent className="space-y-2">{logs.map((log) => <pre key={String(log.id)} className="overflow-auto rounded-xl bg-muted p-3 text-xs">{JSON.stringify(log, null, 2)}</pre>)}</CardContent></Card></TabsContent>
         </Tabs>

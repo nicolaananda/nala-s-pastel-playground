@@ -86,4 +86,18 @@ export const adminApi = {
     method: "POST",
     body: JSON.stringify({ url, title, type }),
   }),
+  uploadFile: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(apiUrl("/api/admin/uploads/file"), {
+      method: "POST",
+      credentials: "include",
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(error.message || "Upload failed");
+    }
+    return response.json() as Promise<{ upload: { url: string; title: string; type: string } }>;
+  },
 };

@@ -7,12 +7,19 @@ import { db, initDatabase } from './db.js';
 import TelegramBot from 'node-telegram-bot-api';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import sharp from 'sharp';
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.resolve(__dirname, '..', 'public', 'uploads');
 
 // Middleware
 // CORS configuration - allow requests from production domain
@@ -38,6 +45,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '2mb' }));
+app.use('/uploads', express.static(uploadDir));
 
 const normalizeCode = (code = '') =>
   code.trim().toUpperCase();
@@ -127,6 +135,137 @@ const normalizeContentInput = (body) => ({
   status: ['draft', 'published', 'archived'].includes(body.status) ? body.status : 'draft',
   sortOrder: Number(body.sortOrder || 0),
 });
+
+const readRequestBuffer = (req, limitBytes = 10 * 1024 * 1024) => new Promise((resolve, reject) => {
+  const chunks = [];
+  let size = 0;
+  req.on('data', (chunk) => {
+    size += chunk.length;
+    if (size > limitBytes) {
+      reject(new Error('File terlalu besar. Maksimal 10MB.'));
+      req.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  });
+  req.on('end', () => resolve(Buffer.concat(chunks)));
+  req.on('error', reject);
+});
+
+const parseMultipartUpload = async (req) => {
+  const contentType = req.headers['content-type'] || '';
+  const boundaryMatch = contentType.match(/boundary=(.+)$/);
+  if (!boundaryMatch) throw new Error('Invalid multipart request');
+
+  const boundary = `--${boundaryMatch[1]}`;
+  const buffer = await readRequestBuffer(req);
+  const raw = buffer.toString('binary');
+  const part = raw.split(boundary).find((section) => section.includes('name="file"'));
+  if (!part) throw new Error('File field tidak ditemukan');
+
+  const filenameMatch = part.match(/filename="([^"]+)"/);
+  const typeMatch = part.match(/Content-Type:\s*([^\r\n]+)/i);
+  if (!filenameMatch) throw new Error('Nama file tidak ditemukan');
+
+  const headerEnd = part.indexOf('\r\n\r\n');
+  if (headerEnd === -1) throw new Error('File upload tidak valid');
+
+  const contentStart = Buffer.byteLength(raw.slice(0, raw.indexOf(part) + headerEnd + 4), 'binary');
+  const contentLength = Buffer.byteLength(part.slice(headerEnd + 4).replace(/\r\n--$/, '').replace(/\r\n$/, ''), 'binary');
+  const fileBuffer = buffer.subarray(contentStart, contentStart + contentLength);
+  const originalName = filenameMatch[1];
+  const ext = path.extname(originalName).toLowerCase();
+  const allowed = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.mp4']);
+  if (!allowed.has(ext)) throw new Error('Tipe file tidak diizinkan');
+
+  return {
+    originalName,
+    contentType: typeMatch?.[1]?.trim() || 'application/octet-stream',
+    buffer: fileBuffer,
+    ext,
+  };
+};
+
+const optimizeUpload = async (upload) => {
+  if (!upload.contentType.startsWith('image/') || upload.ext === '.gif') return upload;
+  const optimized = await sharp(upload.buffer)
+    .rotate()
+    .resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 82, effort: 5 })
+    .toBuffer();
+
+  return {
+    ...upload,
+    buffer: optimized,
+    contentType: 'image/webp',
+    ext: '.webp',
+    optimized: true,
+    originalSize: upload.buffer.length,
+    optimizedSize: optimized.length,
+  };
+};
+
+const hmac = (key, value, encoding) => crypto.createHmac('sha256', key).update(value).digest(encoding);
+const hashHex = (value) => crypto.createHash('sha256').update(value).digest('hex');
+
+const r2Config = () => {
+  const accountId = process.env.R2_ACCOUNT_ID;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  const bucket = process.env.R2_BUCKET;
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null;
+  return {
+    accountId,
+    accessKeyId,
+    secretAccessKey,
+    bucket,
+    publicUrl: (process.env.R2_PUBLIC_URL || `https://pub-${accountId}.r2.dev`).replace(/\/$/, ''),
+  };
+};
+
+const uploadToR2 = async ({ key, buffer, contentType }) => {
+  const config = r2Config();
+  if (!config) return null;
+
+  const region = 'auto';
+  const service = 's3';
+  const host = `${config.accountId}.r2.cloudflarestorage.com`;
+  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+  const url = `https://${host}/${config.bucket}/${encodedKey}`;
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = hashHex(buffer);
+  const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
+  const canonicalRequest = ['PUT', `/${config.bucket}/${encodedKey}`, '', canonicalHeaders, signedHeaders, payloadHash].join('\n');
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, hashHex(canonicalRequest)].join('\n');
+  const kDate = hmac(`AWS4${config.secretAccessKey}`, dateStamp);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  const kSigning = hmac(kService, 'aws4_request');
+  const signature = hmac(kSigning, stringToSign, 'hex');
+  const authorization = `AWS4-HMAC-SHA256 Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: authorization,
+      'Content-Type': contentType,
+      'x-amz-content-sha256': payloadHash,
+      'x-amz-date': amzDate,
+    },
+    body: buffer,
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`R2 upload failed: ${response.status} ${body}`);
+  }
+
+  return `${config.publicUrl}/${encodedKey}`;
+};
 
 // Initialize Midtrans Snap
 const snap = new midtransClient.Snap({
@@ -237,6 +376,31 @@ app.delete('/api/admin/content/:id', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('Archive content error:', error);
     res.status(500).json({ message: 'Failed to archive content', error: error.message });
+  }
+});
+
+app.post('/api/admin/uploads/file', requireAdmin, async (req, res) => {
+  try {
+    const rawUpload = await parseMultipartUpload(req);
+    const upload = await optimizeUpload(rawUpload);
+    const safeBase = path.basename(upload.originalName, path.extname(upload.originalName)).replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'asset';
+    const filename = `admin/${Date.now()}-${safeBase}${upload.ext}`;
+    let url = await uploadToR2({ key: filename, buffer: upload.buffer, contentType: upload.contentType });
+
+    if (!url) {
+      await fs.mkdir(uploadDir, { recursive: true });
+      const localFilename = path.basename(filename);
+      const filePath = path.join(uploadDir, localFilename);
+      await fs.writeFile(filePath, upload.buffer);
+      const baseUrl = (process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+      url = `${baseUrl}/uploads/${localFilename}`;
+    }
+
+    await db.logAdminAction({ adminEmail: req.admin.email, action: 'upload_file', entityType: 'upload', details: { url, originalName: upload.originalName, contentType: upload.contentType, storage: r2Config() ? 'r2' : 'local', optimized: Boolean(upload.optimized), originalSize: upload.originalSize, optimizedSize: upload.optimizedSize } });
+    res.json({ upload: { url, title: upload.originalName, type: upload.contentType, optimized: Boolean(upload.optimized), originalSize: upload.originalSize, optimizedSize: upload.optimizedSize } });
+  } catch (error) {
+    console.error('Upload file error:', error);
+    res.status(400).json({ message: error.message || 'Failed to upload file' });
   }
 });
 

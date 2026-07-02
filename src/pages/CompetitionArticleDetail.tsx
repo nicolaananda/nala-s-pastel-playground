@@ -6,6 +6,15 @@ import { competitionArticles } from "@/data/competitionArticles";
 import { Calendar, MapPin, Trophy } from "lucide-react";
 import { fetchPublicContentItem } from "@/lib/cms";
 
+const formatDateLabel = (value: unknown) => {
+  const text = String(value || "");
+  const date = new Date(text);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  }
+  return text;
+};
+
 const CompetitionArticleDetail = () => {
   const { articleId } = useParams<{ articleId: string }>();
   const [article, setArticle] = useState(competitionArticles.find(a => a.id === articleId) || null);
@@ -16,12 +25,13 @@ const CompetitionArticleDetail = () => {
       .then((item) => setArticle({
         id: item.slug,
         title: item.title,
-        date: String(item.metadata?.displayDate || item.createdAt || ""),
+        date: formatDateLabel(item.metadata?.displayDate || item.createdAt || ""),
         location: String(item.metadata?.location || ""),
         photos: item.imageUrl ? [{ src: item.imageUrl, srcFallback: item.imageUrl, alt: item.title }] : [],
         content: item.description,
         winners: Array.isArray(item.metadata?.winners) ? item.metadata.winners : [],
         featured: Boolean(item.metadata?.featured),
+        contentFormat: String(item.metadata?.contentFormat || item.metadata?.editorMode || "plain"),
       }))
       .catch(() => setArticle(competitionArticles.find(a => a.id === articleId) || null));
   }, [articleId]);
@@ -110,11 +120,15 @@ const CompetitionArticleDetail = () => {
             {/* Content */}
             <div className="prose prose-lg max-w-none">
               <div className="text-base sm:text-lg text-foreground leading-relaxed whitespace-pre-line">
-                {article.content.split('\n\n').map((paragraph, index) => (
-                  <p key={index} className="mb-4 last:mb-0">
-                    {paragraph}
-                  </p>
-                ))}
+                {(article as typeof article & { contentFormat?: string }).contentFormat === "html" ? (
+                  <div dangerouslySetInnerHTML={{ __html: article.content }} />
+                ) : (
+                  article.content.split('\n\n').map((paragraph, index) => (
+                    <p key={index} className="mb-4 last:mb-0">
+                      {paragraph}
+                    </p>
+                  ))
+                )}
               </div>
             </div>
           </CardHeader>

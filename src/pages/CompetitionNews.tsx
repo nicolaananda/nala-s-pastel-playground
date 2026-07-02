@@ -6,6 +6,17 @@ import { competitionArticles } from "@/data/competitionArticles";
 import { Calendar, MapPin } from "lucide-react";
 import { fetchPublicContent } from "@/lib/cms";
 
+const stripHtml = (value: string) => value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+const formatDateLabel = (value: unknown) => {
+  const text = String(value || "");
+  const date = new Date(text);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+  }
+  return text;
+};
+
 const CompetitionNews = () => {
   const [articles, setArticles] = useState(competitionArticles);
 
@@ -16,7 +27,7 @@ const CompetitionNews = () => {
         setArticles(items.map((item) => ({
           id: item.slug,
           title: item.title,
-          date: String(item.metadata?.displayDate || item.createdAt || ""),
+          date: formatDateLabel(item.metadata?.displayDate || item.createdAt || ""),
           location: String(item.metadata?.location || ""),
           photos: item.imageUrl ? [{ src: item.imageUrl, srcFallback: item.imageUrl, alt: item.title }] : [],
           content: item.description,
@@ -117,7 +128,7 @@ const CompetitionNews = () => {
                     )}
 
                     <CardDescription className="text-sm sm:text-base text-muted-foreground line-clamp-4">
-                      {article.content.substring(0, 200)}...
+                      {stripHtml(article.content).substring(0, 200)}...
                     </CardDescription>
 
                     {article.winners.length > 0 && (
