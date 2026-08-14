@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { AccessRecord, adminApi, ContentItem, ContentType } from "@/lib/cms";
+import { AccessRecord, adminApi, ContentItem, ContentType, MediaItem } from "@/lib/cms";
+import SimpleContent from "@/components/SimpleContent";
 
 const emptyItem: ContentItem = {
   type: "book",
@@ -67,6 +68,8 @@ const AdminDashboard = () => {
   const [manualOrderId, setManualOrderId] = useState("");
   const [uploadUrl, setUploadUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [mediaSearch, setMediaSearch] = useState("");
   const visualEditorRef = useRef<HTMLDivElement | null>(null);
 
   const visibleItems = useMemo(() => items.filter((item) => {
@@ -80,16 +83,18 @@ const AdminDashboard = () => {
   const draftCount = useMemo(() => items.filter((item) => item.status === "draft").length, [items]);
 
   const loadAll = async () => {
-    const [me, content, transactionData, auditData] = await Promise.all([
+    const [me, content, transactionData, auditData, mediaData] = await Promise.all([
       adminApi.me(),
       adminApi.listContent(),
       adminApi.transactions(),
       adminApi.auditLogs(),
+      adminApi.media(),
     ]);
     setAdminEmail(me.admin.email);
     setItems(content.items);
     setTransactions(transactionData.transactions);
     setLogs(auditData.logs);
+    setMedia(mediaData.media);
   };
 
   useEffect(() => {
@@ -210,6 +215,17 @@ const AdminDashboard = () => {
       toast.error(error instanceof Error ? error.message : "Upload gagal");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const deleteMedia = async (item: MediaItem) => {
+    if (item.usedBy.length || !window.confirm(`Hapus ${item.title} dari R2? Tindakan ini tidak dapat dibatalkan.`)) return;
+    try {
+      await adminApi.deleteMedia(item.id);
+      toast.success("Media dihapus");
+      await loadAll();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menghapus media");
     }
   };
 
@@ -345,16 +361,7 @@ const AdminDashboard = () => {
                         <Textarea className="min-h-64 font-serif text-base leading-7" value={formItem.description} onChange={(event) => setFormItem({ ...formItem, description: event.target.value })} placeholder={contentFormat === "html" ? "<p>Tulis konten HTML di sini...</p>" : "Tulis konten seperti artikel biasa. Pisahkan paragraf dengan enter dua kali."} />
                       </>
                     ) : (
-                      <div className="prose max-w-none rounded-xl bg-white p-4 text-sm leading-7 shadow-inner">
-                        {contentFormat === "html" ? <div dangerouslySetInnerHTML={{ __html: formItem.description }} /> : formItem.description.split("\n\n").filter(Boolean).map((paragraph, index) => {
-                          if (paragraph.startsWith("**") && paragraph.endsWith("**")) return <h3 key={index}>{paragraph.replace(/\*\*/g, "")}</h3>;
-                          if (paragraph.startsWith("- ")) return <ul key={index}>{paragraph.split("\n").map((line) => <li key={line}>{line.replace(/^- /, "")}</li>)}</ul>;
-                          if (paragraph.startsWith("1. ")) return <ol key={index}>{paragraph.split("\n").map((line) => <li key={line}>{line.replace(/^\d+\. /, "")}</li>)}</ol>;
-                          if (paragraph.startsWith("> ")) return <blockquote key={index}>{paragraph.replace(/^> /, "")}</blockquote>;
-                          if (paragraph === "---") return <hr key={index} />;
-                          return <p key={index}>{paragraph}</p>;
-                        })}
-                      </div>
+                      <SimpleContent content={formItem.description} className="prose max-w-none rounded-xl bg-white p-4 text-sm leading-7 shadow-inner" />
                     )}
                   </div>
 
@@ -365,13 +372,15 @@ const AdminDashboard = () => {
                   <div className="space-y-2 rounded-2xl border p-3">
                     <Label>Gambar cover</Label>
                     <Input value={formItem.imageUrl || ""} onChange={(event) => setFormItem({ ...formItem, imageUrl: event.target.value })} placeholder="https://...jpg" />
-                    <Input type="file" accept="image/*" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "image")} />
+                    <Input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "image")} />
+                    {uploading ? <p className="text-sm font-medium text-primary">Mengupload dan mengoptimalkan gambar…</p> : null}
+                    {formItem.imageUrl ? <img src={formItem.imageUrl} alt="Preview cover" className="max-h-52 rounded-xl border object-contain" /> : null}
                     <p className="text-xs text-muted-foreground">Upload akan masuk ke Cloudflare R2 jika env R2 aktif; paste URL manual juga bisa.</p>
                   </div>
                   <div className="space-y-2 rounded-2xl border p-3">
                     <Label>File / PDF / Video</Label>
                     <Input value={formItem.fileUrl || ""} onChange={(event) => setFormItem({ ...formItem, fileUrl: event.target.value })} placeholder="Kosongkan jika tidak ada" />
-                    <Input type="file" accept="image/*,.pdf,video/mp4" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "file")} />
+                    <Input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "file")} />
                     <p className="text-xs text-muted-foreground">Cocok untuk PDF premium, swatch, atau gambar tambahan. Maks 10MB.</p>
                   </div>
 
@@ -449,7 +458,10 @@ const AdminDashboard = () => {
             <Card><CardHeader><CardTitle>Premium Access Codes</CardTitle></CardHeader><CardContent className="space-y-3">{transactions.map((record) => <div key={`${record.transactionId}-${record.code}`} className="rounded-xl border p-3 text-sm"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><b>{record.code}</b> · {record.orderId} · {record.customer?.email || "no email"}{record.revokedAt ? <span className="ml-2 text-destructive">revoked</span> : null}</div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => adminApi.restoreCode(record.code).then(loadAll)}>Restore</Button><Button size="sm" variant="destructive" onClick={() => adminApi.revokeCode(record.code, "Admin revoke").then(loadAll)}>Revoke</Button></div></div></div>)}</CardContent></Card>
           </TabsContent>
 
-          <TabsContent value="uploads"><Card><CardHeader><CardTitle>Upload / Asset Library</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-muted-foreground">Upload file dari komputer ke Cloudflare R2. Kalau env R2 belum di-set, local dev fallback ke folder server.</p><div className="rounded-2xl border p-4 space-y-3"><Label>Upload file</Label><Input type="file" accept="image/*,.pdf,video/mp4" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "file")} /><p className="text-xs text-muted-foreground">Allowed: jpg, png, webp, gif, pdf, mp4. Maks 10MB.</p></div><div className="flex gap-2"><Input placeholder="https://..." value={uploadUrl} onChange={(event) => setUploadUrl(event.target.value)} /><Button onClick={registerUpload}>Catat URL</Button></div>{uploadUrl ? <div className="rounded-2xl bg-muted p-3 text-sm break-all">URL terakhir: {uploadUrl}</div> : null}</CardContent></Card></TabsContent>
+          <TabsContent value="uploads" className="space-y-4">
+            <Card><CardHeader><CardTitle>Upload / Asset Library</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-muted-foreground">Upload ke Cloudflare R2. Local fallback hanya tersedia saat development.</p><div className="space-y-3 rounded-2xl border p-4"><Label>Upload file</Label><Input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "file")} />{uploading ? <p className="text-sm font-medium text-primary">Mengupload dan mengoptimalkan…</p> : null}<p className="text-xs text-muted-foreground">JPG, PNG, WebP, GIF, PDF, MP4. Maks 10MB.</p></div><div className="flex gap-2"><Input placeholder="https://..." value={uploadUrl} onChange={(event) => setUploadUrl(event.target.value)} /><Button onClick={registerUpload}>Catat URL</Button></div></CardContent></Card>
+            <Card><CardHeader><CardTitle>Media R2</CardTitle></CardHeader><CardContent className="space-y-4"><Input placeholder="Cari nama atau URL…" value={mediaSearch} onChange={(event) => setMediaSearch(event.target.value)} /><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{media.filter((item) => `${item.title} ${item.url}`.toLowerCase().includes(mediaSearch.toLowerCase())).map((item) => <div key={item.id} className="space-y-3 rounded-2xl border p-3">{item.type.startsWith("image/") ? <img src={item.url} alt={item.title} className="h-36 w-full rounded-xl object-cover" /> : <div className="flex h-36 items-center justify-center rounded-xl bg-muted text-sm">{item.type}</div>}<div><p className="truncate font-semibold">{item.title}</p><p className="text-xs text-muted-foreground">{item.size ? `${Math.ceil(item.size / 1024)} KB` : "Ukuran tidak tersedia"}</p></div>{item.usedBy.length ? <p className="text-xs text-amber-700">Dipakai: {item.usedBy.map((ref) => ref.title).join(", ")}</p> : <p className="text-xs text-emerald-700">Tidak digunakan</p>}<div className="flex gap-2"><Button size="sm" variant="outline" className="flex-1" onClick={() => navigator.clipboard.writeText(item.url).then(() => toast.success("URL disalin"))}>Copy URL</Button><Button size="sm" variant="destructive" disabled={Boolean(item.usedBy.length)} onClick={() => deleteMedia(item)}>Hapus</Button></div></div>)}</div>{media.length === 0 ? <p className="text-center text-sm text-muted-foreground">Belum ada upload CMS yang tercatat.</p> : null}</CardContent></Card>
+          </TabsContent>
 
           <TabsContent value="audit"><Card><CardHeader><CardTitle>Audit Log</CardTitle></CardHeader><CardContent className="space-y-2">{logs.map((log) => <pre key={String(log.id)} className="overflow-auto rounded-xl bg-muted p-3 text-xs">{JSON.stringify(log, null, 2)}</pre>)}</CardContent></Card></TabsContent>
         </Tabs>

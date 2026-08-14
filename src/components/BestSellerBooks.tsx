@@ -34,7 +34,7 @@ const fallbackBooks = [
     description: "37 gambar sketsa tematik sepanjang tahun dengan tema hari besar, kebudayaan, dan anak. Dilengkapi 6 video tutorial mewarnai yang dapat diakses via QR Code.",
     image: book3Image,
     imageFallback: book3ImageFallback,
-    price: 85000,
+    price: 86000,
     gradient: "gradient-blue"
   }
 ];
@@ -98,16 +98,17 @@ const BestSellerBooks = () => {
               >
                 <div className={`h-6 sm:h-8 ${getGradientClass(book.gradient)} rounded-t-2xl sm:rounded-t-3xl`} />
                 <CardHeader className="p-4 sm:p-6">
-                  <div className="mb-4">
-                    <picture>
-                      <source srcSet={book.image} type="image/webp" />
-                      <img 
-                        src={book.imageFallback} 
-                        alt={book.title}
-                        className="w-full rounded-xl shadow-md object-cover group-hover:shadow-lg transition-shadow duration-300"
-                        loading="lazy"
-                      />
-                    </picture>
+                  <div className="mb-4 aspect-[4/5] overflow-hidden rounded-xl bg-muted">
+                    <img
+                      src={book.image}
+                      alt={book.title}
+                      className="h-full w-full object-cover shadow-md transition-shadow duration-300 group-hover:shadow-lg"
+                      loading="lazy"
+                      onError={(event) => {
+                        event.currentTarget.onerror = null;
+                        event.currentTarget.src = book.imageFallback;
+                      }}
+                    />
                   </div>
                   <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300">
                     {book.title}

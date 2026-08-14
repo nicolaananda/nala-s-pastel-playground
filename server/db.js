@@ -78,7 +78,7 @@ Sambil berlatih, anak bisa belajar melengkapi gambar untuk kategori TK dan SD se
 3. Tema-tema tersebut diambil dari tema yang sering dilombakan dan cocok untuk latihan lomba mewarnai.
 
 4. Terdapat 6 video tutorial mewarnai yang menarik dan dapat discan melalui QR Code.`,
-    price: 85000,
+    price: 86000,
     metadata: {
       gradient: 'gradient-blue',
       shortDescription: '37 gambar sketsa tematik sepanjang tahun untuk latihan dan persiapan lomba mewarnai, dilengkapi video tutorial.',
@@ -560,6 +560,44 @@ export const db = {
       `INSERT INTO admin_audit_logs (admin_email, action, entity_type, entity_id, details) VALUES ($1,$2,$3,$4,$5)`,
       [adminEmail || null, action, entityType, entityId || null, JSON.stringify(details || {})]
     );
+  },
+
+  async getMediaLibrary() {
+    const logs = await this.getAuditLogs();
+    const content = await this.getAdminContent();
+    const references = new Map();
+    for (const item of content) {
+      for (const url of [item.imageUrl, item.fileUrl].filter(Boolean)) {
+        const usedBy = references.get(url) || [];
+        usedBy.push({ id: item.id, title: item.title, field: item.imageUrl === url ? 'imageUrl' : 'fileUrl' });
+        references.set(url, usedBy);
+      }
+    }
+    return logs
+      .filter((log) => log.action === 'upload_file' && log.details?.url && !log.details?.deletedAt)
+      .map((log) => ({
+        id: log.id,
+        url: log.details.url,
+        title: log.details.originalName || 'Asset',
+        type: log.details.contentType || 'application/octet-stream',
+        size: log.details.optimizedSize || log.details.originalSize || null,
+        createdAt: log.createdAt,
+        usedBy: references.get(log.details.url) || [],
+      }));
+  },
+
+  async markMediaDeleted(id, adminEmail) {
+    if (useMemoryDb) {
+      const row = memoryAuditLogs.find((log) => String(log.id) === String(id) && log.action === 'upload_file');
+      if (!row) return false;
+      row.details = { ...(row.details || {}), deletedAt: new Date().toISOString(), deletedBy: adminEmail };
+      return true;
+    }
+    const result = await pool.query(
+      `UPDATE admin_audit_logs SET details = details || $2::jsonb WHERE id = $1 AND action = 'upload_file' RETURNING id`,
+      [id, JSON.stringify({ deletedAt: new Date().toISOString(), deletedBy: adminEmail })]
+    );
+    return Boolean(result.rows[0]);
   },
 
   async getAuditLogs() {

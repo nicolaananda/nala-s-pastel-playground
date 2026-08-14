@@ -136,7 +136,7 @@ const normalizeContentInput = (body) => ({
   sortOrder: Number(body.sortOrder || 0),
 });
 
-const readRequestBuffer = (req, limitBytes = 10 * 1024 * 1024) => new Promise((resolve, reject) => {
+const readRequestBuffer = (req, limitBytes = 10 * 1024 * 1024 + 64 * 1024) => new Promise((resolve, reject) => {
   const chunks = [];
   let size = 0;
   req.on('data', (chunk) => {
@@ -154,10 +154,10 @@ const readRequestBuffer = (req, limitBytes = 10 * 1024 * 1024) => new Promise((r
 
 const parseMultipartUpload = async (req) => {
   const contentType = req.headers['content-type'] || '';
-  const boundaryMatch = contentType.match(/boundary=(.+)$/);
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
   if (!boundaryMatch) throw new Error('Invalid multipart request');
 
-  const boundary = `--${boundaryMatch[1]}`;
+  const boundary = `--${(boundaryMatch[1] || boundaryMatch[2]).trim()}`;
   const buffer = await readRequestBuffer(req);
   const raw = buffer.toString('binary');
   const part = raw.split(boundary).find((section) => section.includes('name="file"'));
@@ -173,10 +173,22 @@ const parseMultipartUpload = async (req) => {
   const contentStart = Buffer.byteLength(raw.slice(0, raw.indexOf(part) + headerEnd + 4), 'binary');
   const contentLength = Buffer.byteLength(part.slice(headerEnd + 4).replace(/\r\n--$/, '').replace(/\r\n$/, ''), 'binary');
   const fileBuffer = buffer.subarray(contentStart, contentStart + contentLength);
+  if (!fileBuffer.length) throw new Error('File kosong tidak dapat diupload');
   const originalName = filenameMatch[1];
   const ext = path.extname(originalName).toLowerCase();
   const allowed = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.mp4']);
   if (!allowed.has(ext)) throw new Error('Tipe file tidak diizinkan');
+
+  const signatures = {
+    '.jpg': fileBuffer[0] === 0xff && fileBuffer[1] === 0xd8 && fileBuffer[2] === 0xff,
+    '.jpeg': fileBuffer[0] === 0xff && fileBuffer[1] === 0xd8 && fileBuffer[2] === 0xff,
+    '.png': fileBuffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+    '.webp': fileBuffer.subarray(0, 4).toString() === 'RIFF' && fileBuffer.subarray(8, 12).toString() === 'WEBP',
+    '.gif': ['GIF87a', 'GIF89a'].includes(fileBuffer.subarray(0, 6).toString()),
+    '.pdf': fileBuffer.subarray(0, 5).toString() === '%PDF-',
+    '.mp4': fileBuffer.subarray(4, 8).toString() === 'ftyp',
+  };
+  if (!signatures[ext]) throw new Error('Isi file tidak sesuai dengan tipe file');
 
   return {
     originalName,
@@ -212,14 +224,15 @@ const r2Config = () => {
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-  const bucket = process.env.R2_BUCKET;
-  if (!accountId || !accessKeyId || !secretAccessKey || !bucket) return null;
+  const bucket = process.env.R2_BUCKET || process.env.R2_BUCKET_NAME;
+  const publicUrl = process.env.R2_PUBLIC_URL;
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicUrl) return null;
   return {
     accountId,
     accessKeyId,
     secretAccessKey,
     bucket,
-    publicUrl: (process.env.R2_PUBLIC_URL || `https://pub-${accountId}.r2.dev`).replace(/\/$/, ''),
+    publicUrl: publicUrl.replace(/\/$/, ''),
   };
 };
 
@@ -265,6 +278,35 @@ const uploadToR2 = async ({ key, buffer, contentType }) => {
   }
 
   return `${config.publicUrl}/${encodedKey}`;
+};
+
+const deleteFromR2 = async (key) => {
+  const config = r2Config();
+  if (!config || !key.startsWith('admin/')) throw new Error('R2 key tidak valid');
+  const region = 'auto';
+  const service = 's3';
+  const host = `${config.accountId}.r2.cloudflarestorage.com`;
+  const encodedKey = key.split('/').map(encodeURIComponent).join('/');
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = hashHex('');
+  const canonicalHeaders = `host:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = 'host;x-amz-content-sha256;x-amz-date';
+  const canonicalRequest = ['DELETE', `/${config.bucket}/${encodedKey}`, '', canonicalHeaders, signedHeaders, payloadHash].join('\n');
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, hashHex(canonicalRequest)].join('\n');
+  const kDate = hmac(`AWS4${config.secretAccessKey}`, dateStamp);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  const kSigning = hmac(kService, 'aws4_request');
+  const signature = hmac(kSigning, stringToSign, 'hex');
+  const authorization = `AWS4-HMAC-SHA256 Credential=${config.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  const response = await fetch(`https://${host}/${config.bucket}/${encodedKey}`, {
+    method: 'DELETE',
+    headers: { Authorization: authorization, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate },
+  });
+  if (!response.ok && response.status !== 404) throw new Error(`R2 delete failed: ${response.status}`);
 };
 
 // Initialize Midtrans Snap
@@ -388,6 +430,9 @@ app.post('/api/admin/uploads/file', requireAdmin, async (req, res) => {
     let url = await uploadToR2({ key: filename, buffer: upload.buffer, contentType: upload.contentType });
 
     if (!url) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Cloudflare R2 belum dikonfigurasi lengkap');
+      }
       await fs.mkdir(uploadDir, { recursive: true });
       const localFilename = path.basename(filename);
       const filePath = path.join(uploadDir, localFilename);
@@ -409,6 +454,31 @@ app.post('/api/admin/uploads', requireAdmin, async (req, res) => {
   if (!url) return res.status(400).json({ message: 'url is required until R2 upload credentials are configured' });
   await db.logAdminAction({ adminEmail: req.admin.email, action: 'register_upload', entityType: 'upload', details: { url, title, type } });
   res.json({ upload: { url, title: title || '', type: type || 'external-url' } });
+});
+
+app.get('/api/admin/media', requireAdmin, async (req, res) => {
+  const media = await db.getMediaLibrary();
+  res.json({ media });
+});
+
+app.delete('/api/admin/media/:id', requireAdmin, async (req, res) => {
+  try {
+    const media = (await db.getMediaLibrary()).find((item) => String(item.id) === String(req.params.id));
+    if (!media) return res.status(404).json({ message: 'Media tidak ditemukan' });
+    if (media.usedBy.length) return res.status(409).json({ message: 'Media masih digunakan oleh konten', usedBy: media.usedBy });
+    const config = r2Config();
+    const base = `${config?.publicUrl || ''}/`;
+    if (!config || !media.url.startsWith(base)) return res.status(400).json({ message: 'Media bukan objek R2 yang dapat dikelola' });
+    const key = decodeURIComponent(media.url.slice(base.length));
+    if (!key.startsWith('admin/')) return res.status(400).json({ message: 'Hanya media CMS yang dapat dihapus' });
+    await deleteFromR2(key);
+    await db.markMediaDeleted(media.id, req.admin.email);
+    await db.logAdminAction({ adminEmail: req.admin.email, action: 'delete_file', entityType: 'upload', entityId: String(media.id), details: { url: media.url, key } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete media error:', error);
+    res.status(500).json({ message: 'Gagal menghapus media' });
+  }
 });
 
 app.get('/api/admin/audit-logs', requireAdmin, async (req, res) => {

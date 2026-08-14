@@ -18,6 +18,16 @@ export interface ContentItem {
   updatedAt?: string;
 }
 
+export interface MediaItem {
+  id: number;
+  url: string;
+  title: string;
+  type: string;
+  size: number | null;
+  createdAt: string;
+  usedBy: Array<{ id: number; title: string; field: "imageUrl" | "fileUrl" }>;
+}
+
 export interface AccessRecord {
   transactionId: string;
   orderId: string;
@@ -82,6 +92,8 @@ export const adminApi = {
   restoreCode: (code: string) => requestJson<{ record: AccessRecord }>(`/api/admin/access-codes/${code}/restore`, { method: "POST" }),
   generateCode: (orderId: string) => requestJson<{ code: string }>(`/api/transaction/${orderId}/generate-code`, { method: "POST", body: JSON.stringify({}) }),
   auditLogs: () => requestJson<{ logs: Array<Record<string, unknown>> }>("/api/admin/audit-logs"),
+  media: () => requestJson<{ media: MediaItem[] }>("/api/admin/media"),
+  deleteMedia: (id: number) => requestJson<{ success: true }>(`/api/admin/media/${id}`, { method: "DELETE" }),
   registerUpload: (url: string, title: string, type: string) => requestJson<{ upload: { url: string; title: string; type: string } }>("/api/admin/uploads", {
     method: "POST",
     body: JSON.stringify({ url, title, type }),

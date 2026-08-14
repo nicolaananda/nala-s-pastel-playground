@@ -12,12 +12,17 @@
     # RewriteCond %{HTTP:X-Forwarded-Proto} !https
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     
-    # Handle client-side routing untuk React SPA
-    # Semua request yang bukan file atau direktori akan diarahkan ke index.html
+    # Route publik SPA/prerender yang valid.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} ^/(buku/[^/]+|berita-lomba(?:/[^/]+)?|grasp-guide-premium|grasp-sixty-color-premium|sketch-purchase|sketch-premium|admin(?:/login)?)?/?$
+    RewriteRule . /index.html [L]
+
+    # Path lain adalah 404 asli, bukan soft 404.
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} !^/api/
-    RewriteRule . /index.html [L]
+    RewriteRule . /404.html [R=404,L]
 </IfModule>
 
 # Enable Gzip Compression
@@ -62,10 +67,15 @@
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
     
-    # Cache static assets dengan hash (immutable) - 1 tahun
-    <FilesMatch "^/assets/.+-[a-f0-9]+\.(js|css|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|webp|avif)$">
-        Header set Cache-Control "public, immutable, max-age=31536000"
-        Header set Vary "Accept-Encoding"
+    # Vite menghasilkan nama aset ber-hash; aman disimpan immutable.
+    <FilesMatch "-[A-Za-z0-9_-]{8,}\.(js|css|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot|webp|avif)$">
+        Header always set Cache-Control "public, max-age=31536000, immutable"
+        Header append Vary "Accept-Encoding"
+    </FilesMatch>
+
+    # File publik bernama stabil harus diperiksa ulang secara berkala.
+    <FilesMatch "\.(jpg|jpeg|png|gif|ico|svg|webp|avif)$">
+        Header set Cache-Control "public, max-age=3600"
     </FilesMatch>
     
     # NO CACHE untuk index.html (selalu fetch versi terbaru)

@@ -3,6 +3,8 @@ import { useParams, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
+import SimpleContent from "@/components/SimpleContent";
+import Seo from "@/components/Seo";
 import CheckoutForm from "@/components/CheckoutForm";
 import { ContentItem, fetchPublicContentItem } from "@/lib/cms";
 import book1Image from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg?w=800&format=webp&quality=85";
@@ -72,7 +74,7 @@ Seringkali lembar saat lomba mewarnai memiliki sedikit objek didalamnya. Menamba
     title: "COLORING WORKSHEET JUARA 1 LOMBA MEWARNAI",
     image: book3Image,
     imageFallback: book3ImageFallback,
-    price: 85000,
+    price: 86000,
     description: `Buku worksheet mewarnai dengan 37 gambar sketsa tematik sepanjang tahun yang dirancang khusus untuk latihan dan persiapan lomba mewarnai.
 
 **Keunggulan Buku**
@@ -131,6 +133,14 @@ const BookDetail = () => {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-accent/20">
+      <Seo
+        title={`${book.title} | Nala Art Studio`}
+        description={book.description.replace(/\*\*/g, "").replace(/\s+/g, " ").slice(0, 155)}
+        path={`/buku/${bookId}`}
+        image={book.imageFallback}
+        type="product"
+        jsonLd={{ "@context": "https://schema.org", "@type": "Product", name: book.title, image: [book.imageFallback], description: book.description.replace(/\*\*/g, "").replace(/\s+/g, " ").slice(0, 300), offers: { "@type": "Offer", priceCurrency: "IDR", price: book.price, availability: "https://schema.org/InStock", url: `https://artstudionala.com/buku/${bookId}` }, brand: { "@type": "Brand", name: "Nala Art Studio" } }}
+      />
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12">
         <Link 
           to="/" 
@@ -147,38 +157,21 @@ const BookDetail = () => {
               {book.title}
             </CardTitle>
             
-            <div className="mb-6">
-              <picture>
-                <source srcSet={book.image} type="image/webp" />
-                <img 
-                  src={book.imageFallback} 
-                  alt={book.title}
-                  className="w-full rounded-xl sm:rounded-2xl shadow-lg object-cover"
-                  loading="lazy"
-                />
-              </picture>
+            <div className="mb-6 overflow-hidden rounded-xl bg-muted shadow-lg sm:rounded-2xl">
+              <img
+                src={book.image}
+                alt={book.title}
+                className="h-auto w-full object-cover"
+                onError={(event) => {
+                  event.currentTarget.onerror = null;
+                  event.currentTarget.src = book.imageFallback;
+                }}
+              />
             </div>
           </CardHeader>
 
           <CardContent className="p-4 sm:p-6 md:p-8 pt-0">
-            <div className="text-base sm:text-lg text-foreground leading-relaxed">
-              {book.description.split('\n\n').map((paragraph, index) => {
-                const trimmed = paragraph.trim();
-                if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
-                  const title = trimmed.replace(/\*\*/g, '');
-                  return (
-                    <h3 key={index} className="text-xl sm:text-2xl font-bold text-primary mt-6 mb-3 first:mt-0">
-                      {title}
-                    </h3>
-                  );
-                }
-                return (
-                  <p key={index} className="mb-4 last:mb-0">
-                    {paragraph}
-                  </p>
-                );
-              })}
-            </div>
+            <SimpleContent content={book.description} className="text-base leading-relaxed text-foreground sm:text-lg" />
 
             <div className="mt-8 pt-6 border-t-2 border-primary/20">
               <div className="text-center">

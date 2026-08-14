@@ -5,6 +5,7 @@ import Footer from "@/components/Footer";
 import { competitionArticles } from "@/data/competitionArticles";
 import { Calendar, MapPin, Trophy } from "lucide-react";
 import { fetchPublicContentItem } from "@/lib/cms";
+import Seo from "@/components/Seo";
 
 const formatDateLabel = (value: unknown) => {
   const text = String(value || "");
@@ -52,6 +53,14 @@ const CompetitionArticleDetail = () => {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-accent/20">
+      <Seo
+        title={`${article.title} | Nala Art Studio`}
+        description={article.content.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").slice(0, 155)}
+        path={`/berita-lomba/${articleId}`}
+        image={article.photos[0]?.srcFallback}
+        type="article"
+        jsonLd={{ "@context": "https://schema.org", "@type": "Article", headline: article.title, description: article.content.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").slice(0, 300), datePublished: article.date, mainEntityOfPage: `https://artstudionala.com/berita-lomba/${articleId}`, publisher: { "@type": "Organization", name: "Nala Art Studio", logo: { "@type": "ImageObject", url: "https://artstudionala.com/nala-logo.png" } } }}
+      />
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12">
         {/* Navigation */}
         <div className="mb-6 sm:mb-8">
