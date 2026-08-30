@@ -925,19 +925,19 @@ const buildProductSection = (orderId, notification) => {
 const sendTelegramNotification = async (orderId, transactionId, notification, code) => {
   if (!telegramBot) {
     console.warn('⚠️ Telegram bot not initialized - skipping notification');
-    return;
+    return false;
   }
 
   const chatIdConfig = process.env.TELEGRAM_CHAT_ID;
   if (!chatIdConfig) {
     console.warn('⚠️ TELEGRAM_CHAT_ID not set - skipping notification');
-    return;
+    return false;
   }
 
   const chatIds = chatIdConfig.split(',').map(id => id.trim()).filter(id => id);
   if (chatIds.length === 0) {
     console.warn('⚠️ No valid TELEGRAM_CHAT_ID found - skipping notification');
-    return;
+    return false;
   }
 
   try {
@@ -991,19 +991,20 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
 
     const message = sections.join('\n\n');
 
-    const sendPromises = chatIds.map(chatId =>
+    const results = await Promise.allSettled(chatIds.map(chatId =>
       telegramBot.sendMessage(chatId, message, { parse_mode: 'HTML', disable_web_page_preview: true })
-        .then(() => {
-          console.log(`✅ Telegram notification sent to ${chatId} for order ${orderId}`);
-        })
-        .catch(err => {
-          console.error(`❌ Failed to send to ${chatId}:`, err.message);
-        })
-    );
-
-    await Promise.all(sendPromises);
+    ));
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        console.log(`✅ Telegram notification sent to ${chatIds[index]} for order ${orderId}`);
+      } else {
+        console.error(`❌ Failed to send to ${chatIds[index]}:`, result.reason.message);
+      }
+    });
+    return results.every((result) => result.status === 'fulfilled');
   } catch (error) {
     console.error('❌ Failed to send Telegram notification:', error.message);
+    return false;
   }
 };
 
@@ -1013,8 +1014,13 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
     const existingByOrder = await db.findCodeByOrderId(orderId);
     const existingByTransaction = transactionId ? await db.findCodeByTransactionId(transactionId) : null;
 
-    if (existingByOrder || existingByTransaction) {
+    const existing = existingByOrder || existingByTransaction;
+    if (existing) {
       console.log(`Code already exists for order ${orderId}`);
+      if (!existing.telegram_notified_at) {
+        const sent = await sendTelegramNotification(orderId, transactionId, notification, existing.code);
+        if (sent) await db.markTelegramNotified(existing.transaction_id);
+      }
       return;
     }
 
@@ -1059,7 +1065,8 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
     console.log(`✅ Generated/Saved code ${code} for order ${orderId}`);
 
     // Send Telegram Notification (Real-time for all purchases)
-    await sendTelegramNotification(orderId, transactionId, notification, code);
+    const telegramSent = await sendTelegramNotification(orderId, transactionId, notification, code);
+    if (telegramSent) await db.markTelegramNotified(transactionId);
 
     // Send Email Notification for Classes
     console.log(`🔍 Checking Email: isClass=${isClass}`);

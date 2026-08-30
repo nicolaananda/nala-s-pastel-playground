@@ -215,7 +215,8 @@ export const initDatabase = async () => {
     await pool.query(`
       ALTER TABLE grasp_guide_access
       ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS revoked_reason TEXT
+      ADD COLUMN IF NOT EXISTS revoked_reason TEXT,
+      ADD COLUMN IF NOT EXISTS telegram_notified_at TIMESTAMP
     `);
 
     await pool.query(`
@@ -303,6 +304,7 @@ export const db = {
         updated_at: new Date(),
         revoked_at: existing?.revoked_at || null,
         revoked_reason: existing?.revoked_reason || null,
+        telegram_notified_at: existing?.telegram_notified_at || null,
       };
       if (existing) Object.assign(existing, row);
       else memoryAccessCodes.push(row);
@@ -383,6 +385,18 @@ export const db = {
     `;
     const result = await pool.query(query, [transactionId]);
     return result.rows[0] || null;
+  },
+
+  async markTelegramNotified(transactionId) {
+    if (useMemoryDb) {
+      const row = memoryAccessCodes.find((entry) => entry.transaction_id === transactionId);
+      if (row) row.telegram_notified_at = new Date();
+      return;
+    }
+    await pool.query(
+      `UPDATE grasp_guide_access SET telegram_notified_at = CURRENT_TIMESTAMP WHERE transaction_id = $1`,
+      [transactionId]
+    );
   },
 
   // Get all access codes (for admin/migration purposes)
