@@ -2,6 +2,9 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ContentItem, fetchPublicContent } from "@/lib/cms";
+import { Button } from "@/components/ui/button";
+import BookVideoDialog, { SelectedBookVideo } from "@/components/BookVideoDialog";
+import { BookVideo, getBookVideos } from "../../shared/book-videos.js";
 import book1Image from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg?w=600&format=webp&quality=85";
 import book1ImageFallback from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg";
 import book2Image from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg?w=600&format=webp&quality=85";
@@ -9,7 +12,7 @@ import book2ImageFallback from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg";
 import book3Image from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg?w=600&format=webp&quality=85";
 import book3ImageFallback from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg";
 
-const fallbackBooks = [
+const fallbackBooks: Array<{ id: string; title: string; description: string; image: string; imageFallback: string; price: number; gradient: string; videos?: BookVideo[] }> = [
   {
     id: "tips-trik-juara-1-lomba-mewarnai",
     title: "Tips & Trick Juara 1 Lomba Mewarnai",
@@ -47,6 +50,7 @@ const cmsBookToCard = (item: ContentItem) => ({
   imageFallback: item.imageUrl || fallbackBooks[0].imageFallback,
   price: item.price || 0,
   gradient: String(item.metadata?.gradient || "gradient-pink"),
+  videos: getBookVideos(item.metadata?.videos),
 });
 
 const getGradientClass = (gradient: string) => {
@@ -64,6 +68,7 @@ const getGradientClass = (gradient: string) => {
 
 const BestSellerBooks = () => {
   const [books, setBooks] = useState(fallbackBooks);
+  const [selectedVideo, setSelectedVideo] = useState<SelectedBookVideo | null>(null);
 
   useEffect(() => {
     fetchPublicContent("book")
@@ -87,18 +92,14 @@ const BestSellerBooks = () => {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
           {books.map((book, index) => (
-            <Link 
-              key={book.id}
-              to={`/buku/${book.id}`}
-              className="block"
-            >
               <Card 
-                className="border-2 sm:border-4 border-primary/30 rounded-2xl sm:rounded-3xl shadow-hover hover:shadow-soft transition-all duration-300 hover:scale-110 hover:-rotate-3 hover:border-primary/60 animate-bounce-in bg-gradient-to-br from-card to-accent/10 group cursor-pointer h-full"
+                key={book.id}
+                className="min-w-0 overflow-hidden border-2 sm:border-4 border-primary/30 rounded-2xl sm:rounded-3xl shadow-hover hover:shadow-soft transition-[box-shadow,border-color] duration-300 hover:border-primary/60 animate-bounce-in bg-gradient-to-br from-card to-accent/10 group flex flex-col h-full"
                 style={{ animationDelay: `${index * 0.15}s` }}
               >
                 <div className={`h-6 sm:h-8 ${getGradientClass(book.gradient)} rounded-t-2xl sm:rounded-t-3xl`} />
                 <CardHeader className="p-4 sm:p-6">
-                  <div className="mb-4 aspect-[4/5] overflow-hidden rounded-xl bg-muted">
+                  <Link to={`/buku/${book.id}`} aria-label={`Lihat detail ${book.title}`} className="block mb-4 aspect-[4/5] overflow-hidden rounded-xl bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                     <img
                       src={book.image}
                       alt={book.title}
@@ -109,30 +110,35 @@ const BestSellerBooks = () => {
                         event.currentTarget.src = book.imageFallback;
                       }}
                     />
-                  </div>
+                  </Link>
                   <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-300">
-                    {book.title}
+                    <Link to={`/buku/${book.id}`} className="break-words hover:underline">{book.title}</Link>
                   </CardTitle>
                   <CardDescription className="text-sm sm:text-base text-muted-foreground mt-2 line-clamp-4">
                     {book.description}
                   </CardDescription>
                 </CardHeader>
                 
-                <CardContent className="pt-4 sm:pt-6 p-4 sm:p-6">
+                <CardContent className="mt-auto pt-4 sm:pt-6 p-4 sm:p-6">
                   <div className="mb-3 text-center">
                     <span className="text-lg sm:text-xl font-bold text-primary">
                       Rp {book.price.toLocaleString('id-ID')}
                     </span>
                   </div>
-                  <button className="w-full px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-primary via-yellow-400 to-primary bg-[length:200%_100%] hover:bg-[position:100%_0] text-primary-foreground font-bold text-sm sm:text-base rounded-full shadow-hover hover:shadow-soft transition-all duration-500 hover:scale-110 active:scale-95 border-2 sm:border-3 border-foreground/10 touch-manipulation hover:animate-wiggle group/btn">
-                    <span className="inline-block group-hover/btn:animate-bounce">📖</span> Lihat Detail
-                  </button>
+                  <div className={`grid gap-2 ${book.videos?.length ? "grid-cols-2" : "grid-cols-1"}`}>
+                    <Button asChild className="w-full rounded-full font-bold"><Link to={`/buku/${book.id}`}>📖 Lihat Detail</Link></Button>
+                    {book.videos?.length ? (
+                      <Button type="button" variant="outline" className="w-full rounded-full border-2 border-primary/40 bg-pink-50/60 hover:bg-pink-100" aria-label={`Lihat video ${book.title}`} aria-haspopup="dialog" onClick={(event) => setSelectedVideo({ video: book.videos![0], slug: book.id, bookTitle: book.title, trigger: event.currentTarget })}>
+                        ▶ Lihat Video
+                      </Button>
+                    ) : null}
+                  </div>
                 </CardContent>
               </Card>
-            </Link>
           ))}
         </div>
       </div>
+      <BookVideoDialog selected={selectedVideo} onClose={() => setSelectedVideo(null)} />
     </section>
   );
 };

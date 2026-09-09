@@ -11,6 +11,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
+import { normalizeVideoMetadata, VideoValidationError } from '../shared/book-videos.js';
 
 // Load environment variables
 dotenv.config();
@@ -131,7 +132,7 @@ const normalizeContentInput = (body) => ({
   price: body.price === '' || body.price === null || body.price === undefined ? null : Number(body.price),
   imageUrl: String(body.imageUrl || '').trim(),
   fileUrl: String(body.fileUrl || '').trim(),
-  metadata: parseMetadata(body.metadata),
+  metadata: normalizeVideoMetadata(body.metadata),
   status: ['draft', 'published', 'archived'].includes(body.status) ? body.status : 'draft',
   sortOrder: Number(body.sortOrder || 0),
 });
@@ -388,6 +389,7 @@ app.post('/api/admin/content', requireAdmin, async (req, res) => {
     await db.logAdminAction({ adminEmail: req.admin.email, action: 'create', entityType: 'content_item', entityId: String(saved.id), details: saved });
     res.status(201).json({ item: saved });
   } catch (error) {
+    if (error instanceof VideoValidationError) return res.status(400).json({ message: error.message });
     console.error('Create content error:', error);
     res.status(500).json({ message: 'Failed to create content', error: error.message });
   }
@@ -404,6 +406,7 @@ app.put('/api/admin/content/:id', requireAdmin, async (req, res) => {
     await db.logAdminAction({ adminEmail: req.admin.email, action: 'update', entityType: 'content_item', entityId: String(saved.id), details: saved });
     res.json({ item: saved });
   } catch (error) {
+    if (error instanceof VideoValidationError) return res.status(400).json({ message: error.message });
     console.error('Update content error:', error);
     res.status(500).json({ message: 'Failed to update content', error: error.message });
   }

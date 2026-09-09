@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Footer from "@/components/Footer";
@@ -7,6 +7,8 @@ import SimpleContent from "@/components/SimpleContent";
 import Seo from "@/components/Seo";
 import CheckoutForm from "@/components/CheckoutForm";
 import { ContentItem, fetchPublicContentItem } from "@/lib/cms";
+import BookVideoDialog, { SelectedBookVideo } from "@/components/BookVideoDialog";
+import { BookVideo, getBookVideos, parseYouTubeUrl } from "../../shared/book-videos.js";
 import book1Image from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg?w=800&format=webp&quality=85";
 import book1ImageFallback from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg";
 import book2Image from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg?w=800&format=webp&quality=85";
@@ -95,6 +97,7 @@ type BookView = {
   imageFallback: string;
   price: number;
   description: string;
+  videos?: BookVideo[];
 };
 
 const cmsBookToView = (item: ContentItem): BookView => ({
@@ -103,18 +106,30 @@ const cmsBookToView = (item: ContentItem): BookView => ({
   imageFallback: item.imageUrl || book1ImageFallback,
   price: item.price || 0,
   description: item.description,
+  videos: getBookVideos(item.metadata?.videos),
 });
 
 const BookDetail = () => {
   const { bookId } = useParams<{ bookId: string }>();
   const [book, setBook] = useState<BookView | null>(bookId ? fallbackBooks[bookId as keyof typeof fallbackBooks] || null : null);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<SelectedBookVideo | null>(null);
+  const { hash } = useLocation();
+
+  useEffect(() => {
+    if (hash === "#video-buku" && book?.videos?.length) document.getElementById("video-buku")?.scrollIntoView();
+  }, [hash, book]);
 
   useEffect(() => {
     if (!bookId) return;
+    let active = true;
+    setBook(fallbackBooks[bookId as keyof typeof fallbackBooks] || null);
+    setSelectedVideo(null);
+    setShowCheckout(false);
     fetchPublicContentItem("book", bookId)
-      .then((item) => setBook(cmsBookToView(item)))
-      .catch(() => setBook(fallbackBooks[bookId as keyof typeof fallbackBooks] || null));
+      .then((item) => { if (active) setBook(cmsBookToView(item)); })
+      .catch(() => { if (active) setBook(fallbackBooks[bookId as keyof typeof fallbackBooks] || null); });
+    return () => { active = false; };
   }, [bookId]);
 
   if (!book) {
@@ -173,6 +188,24 @@ const BookDetail = () => {
           <CardContent className="p-4 sm:p-6 md:p-8 pt-0">
             <SimpleContent content={book.description} className="text-base leading-relaxed text-foreground sm:text-lg" />
 
+            {book.videos?.length ? (
+              <section id="video-buku" aria-labelledby="video-buku-title" className="mt-8 scroll-mt-6 rounded-2xl border-2 border-primary/20 bg-pink-50/50 p-4 sm:p-6">
+                <h2 id="video-buku-title" className="text-xl font-bold sm:text-2xl">Video Buku</h2>
+                <p className="mt-2 text-sm text-muted-foreground">Intip isi dan tutorial buku. Pilih video untuk membuka pemutar.</p>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {book.videos.map((video) => (
+                    <button key={video.url} type="button" aria-label={`Lihat video: ${video.title}`} aria-haspopup="dialog" className="group min-w-0 overflow-hidden rounded-xl border border-primary/20 bg-background text-left shadow-sm transition-[box-shadow,border-color] hover:border-primary/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={(event) => setSelectedVideo({ video, slug: bookId || "", bookTitle: book.title, trigger: event.currentTarget })}>
+                      <span className="relative block aspect-[9/16] overflow-hidden bg-muted">
+                        <img src={`https://i.ytimg.com/vi/${parseYouTubeUrl(video.url).videoId}/hqdefault.jpg`} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" width={480} height={360} className="h-full w-full object-cover" />
+                        <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-background/95 text-primary shadow-md group-hover:bg-pink-100">▶</span></span>
+                      </span>
+                      <span className="block break-words p-3 text-sm font-semibold">{video.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
             <div className="mt-8 pt-6 border-t-2 border-primary/20">
               <div className="text-center">
                 <div className="mb-4">
@@ -210,6 +243,7 @@ const BookDetail = () => {
       </div>
       
       <Footer />
+      <BookVideoDialog selected={selectedVideo} onClose={() => setSelectedVideo(null)} />
     </main>
   );
 };

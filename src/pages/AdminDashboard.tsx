@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { AccessRecord, adminApi, ContentItem, ContentType, MediaItem } from "@/lib/cms";
 import SimpleContent from "@/components/SimpleContent";
+import BookVideoEditor from "@/components/BookVideoEditor";
+import { normalizeVideoMetadata } from "../../shared/book-videos.js";
 
 const emptyItem: ContentItem = {
   type: "book",
@@ -62,6 +64,8 @@ const AdminDashboard = () => {
   const [statusFilter, setStatusFilter] = useState<"all" | ContentItem["status"]>("all");
   const [formItem, setFormItem] = useState<ContentItem>(emptyItem);
   const [metadataText, setMetadataText] = useState("{}");
+  const [saveError, setSaveError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [contentFormat, setContentFormat] = useState<ContentFormat>("plain");
   const [editorView, setEditorView] = useState<EditorView>("write");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -102,6 +106,7 @@ const AdminDashboard = () => {
   }, [navigate]);
 
   const resetForm = (type = selectedType) => {
+    setSaveError("");
     setFormItem({ ...emptyItem, type });
     setMetadataText("{}");
     setContentFormat("plain");
@@ -110,6 +115,7 @@ const AdminDashboard = () => {
   };
 
   const editItem = (item: ContentItem) => {
+    setSaveError("");
     setFormItem(item);
     setSelectedType(item.type);
     setMetadataText(JSON.stringify(item.metadata || {}, null, 2));
@@ -118,9 +124,14 @@ const AdminDashboard = () => {
   };
 
   const updateMetadata = (key: string, value: unknown) => {
-    const current = JSON.parse(metadataText || "{}");
-    const next = { ...current, [key]: value };
-    setMetadataText(JSON.stringify(next, null, 2));
+    try {
+      const current = JSON.parse(metadataText || "{}");
+      if (!current || typeof current !== "object" || Array.isArray(current)) throw new Error();
+      const next = { ...current, [key]: value };
+      setMetadataText(JSON.stringify(next, null, 2));
+    } catch {
+      setSaveError("Metadata JSON tidak valid. Perbaiki Advanced JSON; data editor tidak dihapus.");
+    }
   };
 
   const metadataValue = (key: string) => {
@@ -160,19 +171,26 @@ const AdminDashboard = () => {
 
   const saveItem = async (event: FormEvent) => {
     event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setSaveError("");
     try {
       const metadata = {
-        ...JSON.parse(metadataText || "{}"),
+        ...normalizeVideoMetadata(metadataText || "{}"),
         contentFormat,
         editorMode: contentFormat,
         shortDescription: metadataValue("shortDescription") || clampExcerpt(formItem.description),
       };
-      await adminApi.saveContent({ ...formItem, metadata });
+      const result = await adminApi.saveContent({ ...formItem, metadata });
       toast.success("Konten tersimpan");
-      resetForm(formItem.type);
-      await loadAll();
+      editItem(result.item);
+      await loadAll().catch(() => toast.error("Konten tersimpan, tetapi daftar gagal dimuat ulang. Muat ulang halaman untuk memperbarui daftar."));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gagal simpan konten");
+      const message = error instanceof Error ? error.message : "Gagal simpan konten";
+      setSaveError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -286,6 +304,7 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <form className="space-y-4" onSubmit={saveItem}>
+                  <fieldset disabled={saving} className="min-w-0 space-y-4">
                   <div className="space-y-2">
                     <Label>Jenis konten</Label>
                     <Select value={formItem.type} onValueChange={(value: ContentType) => setFormItem({ ...formItem, type: value })}>
@@ -385,6 +404,10 @@ const AdminDashboard = () => {
                   </div>
 
                   {formItem.type === "book" ? (
+                    <BookVideoEditor metadataText={metadataText} onChange={setMetadataText} />
+                  ) : null}
+
+                  {formItem.type === "book" ? (
                     <div className="space-y-2"><Label>Warna kartu buku</Label><Select value={String(metadataValue("gradient") || "gradient-pink")} onValueChange={(value) => updateMetadata("gradient", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="gradient-pink">Pink Kuning</SelectItem><SelectItem value="gradient-pink-blue">Pink Biru</SelectItem><SelectItem value="gradient-blue">Biru</SelectItem></SelectContent></Select></div>
                   ) : null}
 
@@ -413,7 +436,9 @@ const AdminDashboard = () => {
                     {showAdvanced ? <div className="mt-3 space-y-2"><Label>Metadata JSON</Label><Textarea className="min-h-40 font-mono text-xs" value={metadataText} onChange={(event) => setMetadataText(event.target.value)} /></div> : null}
                   </div>
 
-                  <div className="flex gap-2"><Button type="submit" className="flex-1">Simpan Konten</Button><Button type="button" variant="outline" onClick={() => resetForm()}>Reset</Button></div>
+                  {saveError ? <p role="alert" className="rounded-xl border border-destructive bg-destructive/5 p-3 text-sm text-destructive">{saveError} Data editor tetap tersedia.</p> : null}
+                  <div className="flex gap-2"><Button type="submit" className="flex-1">{saving ? "Menyimpan…" : "Simpan Konten"}</Button><Button type="button" variant="outline" onClick={() => resetForm()}>Reset</Button></div>
+                  </fieldset>
                 </form>
               </CardContent>
             </Card>
