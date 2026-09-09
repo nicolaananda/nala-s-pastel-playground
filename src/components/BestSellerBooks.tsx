@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ContentItem, fetchPublicContent } from "@/lib/cms";
+import { ContentItem, fetchPublicContent, getBootContent } from "@/lib/cms";
 import { Button } from "@/components/ui/button";
 import BookVideoDialog, { SelectedBookVideo } from "@/components/BookVideoDialog";
 import { BookVideo, getBookVideos } from "../../shared/book-videos.js";
@@ -67,15 +67,15 @@ const getGradientClass = (gradient: string) => {
 };
 
 const BestSellerBooks = () => {
-  const [books, setBooks] = useState(fallbackBooks);
+  const [books, setBooks] = useState(() => getBootContent('book').map(cmsBookToCard));
   const [selectedVideo, setSelectedVideo] = useState<SelectedBookVideo | null>(null);
 
   useEffect(() => {
     fetchPublicContent("book")
       .then((items) => {
-        if (items.length) setBooks(items.map(cmsBookToCard));
+        setBooks(items.map(cmsBookToCard));
       })
-      .catch(() => setBooks(fallbackBooks));
+      .catch(() => {}); // Keep the matching public snapshot if CMS is temporarily offline.
   }, []);
 
   return (
@@ -83,7 +83,7 @@ const BestSellerBooks = () => {
       <div className="container mx-auto max-w-6xl">
         <div className="text-center mb-8 sm:mb-12 md:mb-16 animate-fade-in">
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 sm:mb-4 text-foreground sparkle">
-            📚 3 Buku Best Seller
+            📚 {books.length} Buku Best Seller
           </h2>
           <p className="text-lg sm:text-xl md:text-2xl text-primary font-semibold">
             Seri "Juara 1 Lomba Mewarnai" 🏆

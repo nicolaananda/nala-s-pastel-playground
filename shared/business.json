@@ -1,0 +1,18 @@
+{
+  "name": "Nala Art Studio",
+  "url": "https://artstudionala.com",
+  "telephone": "+628972598311",
+  "displayPhone": "0897-2598-311",
+  "streetAddress": "Jl. Perumahan Ketileng Indah, Sendangmulyo, Kec. Tembalang",
+  "addressLocality": "Kota Semarang",
+  "addressRegion": "Jawa Tengah",
+  "postalCode": "50272",
+  "addressCountry": "ID",
+  "mapUrl": "https://maps.app.goo.gl/KGFDawFFvY8wr4MeA",
+  "openingHours": "Mo-Su 00:00-24:00",
+  "services": [
+    {"name": "Coloring Silky Crayon", "description": "Kelas mewarnai dengan silky crayon.", "schedule": "Kamis, 14.00 WIB"},
+    {"name": "Drawing Chibi Acrylic Marker", "description": "Menggambar karakter chibi dengan acrylic marker.", "schedule": "Jumat, 19.00 WIB"},
+    {"name": "Melengkapi Gambar & Mewarnai", "description": "Latihan melengkapi gambar dan mewarnai.", "schedule": "Sabtu, 16.00 WIB"}
+  ]
+}

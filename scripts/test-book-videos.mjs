@@ -56,7 +56,7 @@ const normalizeSource = server.match(/const normalizeContentInput = [\s\S]*?\n\}
 const routesSource = server.slice(server.indexOf("app.post('/api/admin/content',"), server.indexOf("app.delete('/api/admin/content/:id',"));
 const routes = {};
 let writes = 0;
-const context = vm.createContext({ normalizeVideoMetadata, VideoValidationError, console, requireAdmin: () => {}, app: {
+const context = vm.createContext({ normalizeVideoMetadata, VideoValidationError, console, refreshAfterCmsSave: async () => ({ok:true}), requireAdmin: () => {}, app: {
   post: (path, auth, handler) => { routes.post = handler; },
   put: (path, auth, handler) => { routes.put = handler; },
 }, db: { createContentItem: async (item) => { writes++; return { ...item, id: 1 }; }, updateContentItem: async (id, item) => { writes++; return { ...item, id }; }, logAdminAction: async () => {} } });

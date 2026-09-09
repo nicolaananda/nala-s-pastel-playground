@@ -1,4 +1,5 @@
 import { Instagram, Youtube, ShoppingBag } from "lucide-react";
+import business from "../../shared/business.json";
 
 // TikTok Icon Component
 const TikTokIcon = ({ className }: { className?: string }) => (
@@ -53,6 +54,15 @@ const Footer = () => {
             </p>
           </div>
           
+          <section id="kontak" aria-label="Alamat dan kontak studio" className="mx-auto max-w-xl space-y-3 text-center text-sm sm:text-base">
+            <address className="not-italic">{business.streetAddress}, {business.addressLocality}, {business.addressRegion} {business.postalCode}</address>
+            <p>Operasional: 24 jam. Jadwal kelas mengikuti jadwal masing-masing kelas.</p>
+            <div className="flex flex-wrap justify-center gap-4">
+              <a className="font-semibold underline underline-offset-4" href={business.mapUrl} target="_blank" rel="noopener noreferrer">Lokasi Google Maps ↗</a>
+              <a className="font-semibold underline underline-offset-4" href={`https://wa.me/${business.telephone.slice(1)}`} target="_blank" rel="noopener noreferrer">WhatsApp {business.displayPhone}</a>
+            </div>
+          </section>
+
           {/* Social Media Links */}
           <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
             {socialLinks.map((social) => {

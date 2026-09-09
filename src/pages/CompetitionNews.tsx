@@ -2,9 +2,10 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
-import { competitionArticles } from "@/data/competitionArticles";
+
 import { Calendar, MapPin } from "lucide-react";
-import { fetchPublicContent } from "@/lib/cms";
+import { fetchPublicContent, getBootContent, cmsArticleToView } from "@/lib/cms";
+import Seo from '@/components/Seo';
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
@@ -18,24 +19,14 @@ const formatDateLabel = (value: unknown) => {
 };
 
 const CompetitionNews = () => {
-  const [articles, setArticles] = useState(competitionArticles);
+  const [articles, setArticles] = useState(() => getBootContent('article').map(cmsArticleToView));
 
   useEffect(() => {
     fetchPublicContent("article")
       .then((items) => {
-        if (!items.length) return;
-        setArticles(items.map((item) => ({
-          id: item.slug,
-          title: item.title,
-          date: formatDateLabel(item.metadata?.displayDate || item.createdAt || ""),
-          location: String(item.metadata?.location || ""),
-          photos: item.imageUrl ? [{ src: item.imageUrl, srcFallback: item.imageUrl, alt: item.title }] : [],
-          content: item.description,
-          winners: Array.isArray(item.metadata?.winners) ? item.metadata.winners : [],
-          featured: Boolean(item.metadata?.featured),
-        })));
+        setArticles(items.map(cmsArticleToView));
       })
-      .catch(() => setArticles(competitionArticles));
+      .catch(() => {});
   }, []);
 
   // Sort articles by date (newest first)
@@ -45,6 +36,7 @@ const CompetitionNews = () => {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-accent/20">
+      <Seo title="Berita Lomba Mewarnai | Nala Art Studio" description="Informasi dan dokumentasi kegiatan serta lomba mewarnai Nala Art Studio." path="/berita-lomba" />
       <div className="container mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-12">
         {/* Header */}
         <div className="text-center mb-8 sm:mb-12 md:mb-16 animate-fade-in">

@@ -182,7 +182,8 @@ const AdminDashboard = () => {
         shortDescription: metadataValue("shortDescription") || clampExcerpt(formItem.description),
       };
       const result = await adminApi.saveContent({ ...formItem, metadata });
-      toast.success("Konten tersimpan");
+      if (result.seo?.ok === false) toast.warning(result.seo.message);
+      else toast.success("Konten tersimpan");
       editItem(result.item);
       await loadAll().catch(() => toast.error("Konten tersimpan, tetapi daftar gagal dimuat ulang. Muat ulang halaman untuk memperbarui daftar."));
     } catch (error) {
@@ -196,8 +197,9 @@ const AdminDashboard = () => {
 
   const archiveItem = async (item: ContentItem) => {
     if (!item.id || !window.confirm(`Archive ${item.title}?`)) return;
-    await adminApi.archiveContent(item.id);
-    toast.success("Konten diarsipkan");
+    const result = await adminApi.archiveContent(item.id);
+    if (result.seo?.ok === false) toast.warning(result.seo.message);
+    else toast.success("Konten diarsipkan");
     await loadAll();
   };
 

@@ -2,9 +2,10 @@ import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
-import { competitionArticles } from "@/data/competitionArticles";
+
 import { Calendar, MapPin, Trophy } from "lucide-react";
-import { fetchPublicContentItem } from "@/lib/cms";
+import { fetchPublicContentItem, getBootContent, cmsArticleToView } from "@/lib/cms";
+import { itemSchema } from '../../shared/seo.js';
 import Seo from "@/components/Seo";
 
 const formatDateLabel = (value: unknown) => {
@@ -18,30 +19,29 @@ const formatDateLabel = (value: unknown) => {
 
 const CompetitionArticleDetail = () => {
   const { articleId } = useParams<{ articleId: string }>();
-  const [article, setArticle] = useState(competitionArticles.find(a => a.id === articleId) || null);
+  const bootArticle = () => { const item = getBootContent('article').find(item => item.slug === articleId); return item ? cmsArticleToView(item) : null; };
+  const [article, setArticle] = useState(bootArticle);
+  const [loading, setLoading] = useState(!article);
 
   useEffect(() => {
     if (!articleId) return;
+    let active = true;
+    const initialItem = getBootContent("article").find(item => item.slug === articleId);
+    setArticle(initialItem ? cmsArticleToView(initialItem) : null);
+    setLoading(true);
     fetchPublicContentItem("article", articleId)
-      .then((item) => setArticle({
-        id: item.slug,
-        title: item.title,
-        date: formatDateLabel(item.metadata?.displayDate || item.createdAt || ""),
-        location: String(item.metadata?.location || ""),
-        photos: item.imageUrl ? [{ src: item.imageUrl, srcFallback: item.imageUrl, alt: item.title }] : [],
-        content: item.description,
-        winners: Array.isArray(item.metadata?.winners) ? item.metadata.winners : [],
-        featured: Boolean(item.metadata?.featured),
-        contentFormat: String(item.metadata?.contentFormat || item.metadata?.editorMode || "plain"),
-      }))
-      .catch(() => setArticle(competitionArticles.find(a => a.id === articleId) || null));
+      .then((item) => { if (active) setArticle(cmsArticleToView(item)); })
+      .catch((error) => { if (active && error.status === 404) setArticle(null); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [articleId]);
 
   if (!article) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
         <div className="text-center">
-          <h1 className="mb-4 text-4xl font-bold">Artikel Tidak Ditemukan</h1>
+          <Seo title="Artikel Tidak Tersedia | Nala Art Studio" description="Artikel tidak tersedia." path={`/berita-lomba/${articleId}`} noindex />
+          <h1 className="mb-4 text-4xl font-bold">{loading ? 'Memuat Artikel…' : 'Artikel Tidak Ditemukan'}</h1>
           <p className="mb-4 text-xl text-muted-foreground">Artikel yang Anda cari tidak tersedia</p>
           <Link to="/berita-lomba" className="text-primary underline hover:text-primary/90">
             Kembali ke Berita Lomba
@@ -59,7 +59,7 @@ const CompetitionArticleDetail = () => {
         path={`/berita-lomba/${articleId}`}
         image={article.photos[0]?.srcFallback}
         type="article"
-        jsonLd={{ "@context": "https://schema.org", "@type": "Article", headline: article.title, description: article.content.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").slice(0, 300), datePublished: article.date, mainEntityOfPage: `https://artstudionala.com/berita-lomba/${articleId}`, publisher: { "@type": "Organization", name: "Nala Art Studio", logo: { "@type": "ImageObject", url: "https://artstudionala.com/nala-logo.png" } } }}
+        jsonLd={itemSchema(article.cmsItem)}
       />
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12">
         {/* Navigation */}
@@ -85,9 +85,9 @@ const CompetitionArticleDetail = () => {
               </div>
             )}
 
-            <CardTitle className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
               {article.title}
-            </CardTitle>
+            </h1>
             
             <div className="flex flex-wrap items-center gap-4 text-sm sm:text-base text-muted-foreground mb-6">
               <div className="flex items-center gap-2">
@@ -129,15 +129,11 @@ const CompetitionArticleDetail = () => {
             {/* Content */}
             <div className="prose prose-lg max-w-none">
               <div className="text-base sm:text-lg text-foreground leading-relaxed whitespace-pre-line">
-                {(article as typeof article & { contentFormat?: string }).contentFormat === "html" ? (
-                  <div dangerouslySetInnerHTML={{ __html: article.content }} />
-                ) : (
-                  article.content.split('\n\n').map((paragraph, index) => (
+                {article.content.split('\n\n').map((paragraph, index) => (
                     <p key={index} className="mb-4 last:mb-0">
                       {paragraph}
                     </p>
-                  ))
-                )}
+                  ))}
               </div>
             </div>
           </CardHeader>

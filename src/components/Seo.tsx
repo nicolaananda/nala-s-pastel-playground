@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { breadcrumb } from '../../shared/seo.js';
 
 interface SeoProps {
   title: string;
@@ -32,20 +33,22 @@ const Seo = ({ title, description, path, image = DEFAULT_IMAGE, type = "website"
     setMeta('meta[property="og:title"]', { property: "og:title", content: title });
     setMeta('meta[property="og:description"]', { property: "og:description", content: description });
     setMeta('meta[property="og:url"]', { property: "og:url", content: url });
-    setMeta('meta[property="og:type"]', { property: "og:type", content: type === "article" ? "article" : "website" });
+    setMeta('meta[property="og:type"]', { property: "og:type", content: type === "article" ? "article" : type === 'product' ? 'product' : "website" });
     setMeta('meta[property="og:image"]', { property: "og:image", content: absoluteImage });
     setMeta('meta[name="twitter:title"]', { name: "twitter:title", content: title });
     setMeta('meta[name="twitter:description"]', { name: "twitter:description", content: description });
     setMeta('meta[name="twitter:image"]', { name: "twitter:image", content: absoluteImage });
+    setMeta('meta[name="twitter:url"]', { name: "twitter:url", content: url });
+    document.querySelectorAll('meta[property="og:image:width"],meta[property="og:image:height"]').forEach(el => el.remove());
     let canonical = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
     if (!canonical) { canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
     canonical.href = url;
     document.getElementById("page-jsonld")?.remove();
-    if (jsonLd) {
+    if (!noindex) {
       const script = document.createElement("script");
       script.id = "page-jsonld";
       script.type = "application/ld+json";
-      script.text = JSON.stringify(jsonLd);
+      script.text = JSON.stringify([...(jsonLd ? [jsonLd] : []), breadcrumb(path, title)]);
       document.head.appendChild(script);
     }
   }, [description, image, jsonLd, noindex, path, title, type]);

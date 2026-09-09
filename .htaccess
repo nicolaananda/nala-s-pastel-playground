@@ -6,16 +6,25 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
+    # Internal build snapshots are not public pages.
+    RewriteRule ^\.(?!well-known/).* - [F,L]
     
     # Redirect HTTP ke HTTPS (uncomment jika SSL tersedia)
     # RewriteCond %{HTTPS} off
     # RewriteCond %{HTTP:X-Forwarded-Proto} !https
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     
-    # Route publik SPA/prerender yang valid.
+    # CMS routes exist only when their generated index exists, including empty archived directories.
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^(?:buku|berita-lomba)/[a-z0-9-]+/index\.html$ - [L]
+    RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
+    RewriteRule ^((?:buku|berita-lomba)/[a-z0-9]+(?:-[a-z0-9]+)*)/?$ /$1/index.html [L]
+    RewriteRule ^(?:buku|berita-lomba)/.+$ - [R=404,L]
+
+    # Registered static SPA routes remain available.
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_URI} ^/(buku/[^/]+|berita-lomba(?:/[^/]+)?|grasp-guide-premium|grasp-sixty-color-premium|sketch-purchase|sketch-premium|admin(?:/login)?)?/?$
+    RewriteCond %{REQUEST_URI} ^/(berita-lomba|grasp-guide-premium|grasp-sixty-color-premium|sketch-purchase|sketch-premium|admin(?:/login)?)?/?$
     RewriteRule . /index.html [L]
 
     # Path lain adalah 404 asli, bukan soft 404.
@@ -78,6 +87,10 @@
         Header set Cache-Control "public, max-age=3600"
     </FilesMatch>
     
+    <FilesMatch "^sitemap\.xml$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+
     # NO CACHE untuk index.html (selalu fetch versi terbaru)
     <FilesMatch "^index\.html$">
         Header set Cache-Control "no-cache, no-store, must-revalidate"

@@ -1,3 +1,5 @@
+import { publicSeoContent } from '../../shared/seo.js';
+
 export type ContentStatus = "draft" | "published" | "archived";
 
 export type ContentType = "book" | "article" | "grasp_asset" | "premium_product" | "merchandise";
@@ -56,20 +58,44 @@ const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(error.message || "Request failed");
+    throw Object.assign(new Error(error.message || "Request failed"), {status: response.status});
   }
   return response.json();
 };
 
+// Only allowlisted public CMS fields are embedded by prerender. No admin data or downloads.
+const bootContent: {books?: ContentItem[]; articles?: ContentItem[]} = (() => {
+  try { return JSON.parse(document.getElementById('seo-public-content')?.textContent || '{}'); }
+  catch { return {}; }
+})();
+export const getBootContent = (type: ContentType): ContentItem[] =>
+  (type === 'book' ? bootContent.books : type === 'article' ? bootContent.articles : []) || [];
+const cleanPublic = (items: ContentItem[], type: ContentType): ContentItem[] => {
+  if (type !== 'book' && type !== 'article') return items;
+  return publicSeoContent({books:type === 'book' ? items : [], articles:type === 'article' ? items : []})[type === 'book' ? 'books' : 'articles'] as ContentItem[];
+};
+
 export const fetchPublicContent = async (type: ContentType) => {
   const data = await requestJson<{ items: ContentItem[] }>(`/api/content/${type}`);
-  return data.items;
+  const items = cleanPublic(data.items, type);
+  if (type === 'book') bootContent.books = items;
+  if (type === 'article') bootContent.articles = items;
+  return items;
 };
 
 export const fetchPublicContentItem = async (type: ContentType, slug: string) => {
   const data = await requestJson<{ item: ContentItem }>(`/api/content/${type}/${slug}`);
-  return data.item;
+  return cleanPublic([data.item], type)[0];
 };
+
+export const cmsArticleToView = (item: ContentItem) => ({
+  id: item.slug, title: item.title, content: item.description,
+  date: String(item.metadata?.displayDate || (item.createdAt ? new Date(item.createdAt).toLocaleDateString('id-ID', {day:'numeric',month:'long',year:'numeric'}) : '')),
+  location: String(item.metadata?.location || ''),
+  photos: item.imageUrl ? [{src:item.imageUrl,srcFallback:item.imageUrl,alt:item.title,caption:''}] : [],
+  winners: (Array.isArray(item.metadata?.winners) ? item.metadata.winners : []) as Array<{name:string;position:string;photo?:string;photoFallback?:string}>,
+  featured: Boolean(item.metadata?.featured), cmsItem: item,
+});
 
 export const adminApi = {
   login: (email: string, password: string) => requestJson<{ admin: { email: string } }>("/api/admin/login", {
@@ -79,11 +105,11 @@ export const adminApi = {
   logout: () => requestJson<{ success: true }>("/api/admin/logout", { method: "POST" }),
   me: () => requestJson<{ admin: { email: string } }>("/api/admin/me"),
   listContent: (type?: string) => requestJson<{ items: ContentItem[] }>(`/api/admin/content${type ? `?type=${type}` : ""}`),
-  saveContent: (item: ContentItem) => requestJson<{ item: ContentItem }>(item.id ? `/api/admin/content/${item.id}` : "/api/admin/content", {
+  saveContent: (item: ContentItem) => requestJson<{ item: ContentItem; seo?: {ok: boolean; message?: string} }>(item.id ? `/api/admin/content/${item.id}` : "/api/admin/content", {
     method: item.id ? "PUT" : "POST",
     body: JSON.stringify(item),
   }),
-  archiveContent: (id: number) => requestJson<{ item: ContentItem }>(`/api/admin/content/${id}`, { method: "DELETE" }),
+  archiveContent: (id: number) => requestJson<{ item: ContentItem; seo?: {ok: boolean; message?: string} }>(`/api/admin/content/${id}`, { method: "DELETE" }),
   transactions: () => requestJson<{ transactions: AccessRecord[]; count: number }>("/api/admin/transactions"),
   revokeCode: (code: string, reason: string) => requestJson<{ record: AccessRecord }>(`/api/admin/access-codes/${code}/revoke`, {
     method: "POST",

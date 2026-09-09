@@ -12,6 +12,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import { normalizeVideoMetadata, VideoValidationError } from '../shared/book-videos.js';
+import { refreshSeoSnapshots } from './seo-snapshots.js';
+import { publicSeoContent } from '../shared/seo.js';
 
 // Load environment variables
 dotenv.config();
@@ -322,10 +324,27 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API is running' });
 });
 
+const refreshAfterCmsSave = async () => {
+  try {
+    const result = await refreshSeoSnapshots({
+      outputDir: process.env.SEO_OUTPUT_DIR,
+      loadContent: async () => ({books: await db.getPublicContent('book'), articles: await db.getPublicContent('article')}),
+    });
+    return {ok:true, ...result};
+  } catch (error) {
+    // The CMS save succeeded; report SEO separately rather than prompting duplicate saves.
+    console.error('SEO refresh failed; last-good snapshots retained:', error);
+    return {ok:false, message:'Konten tersimpan, tetapi refresh SEO gagal. Periksa log server.'};
+  }
+};
+const publicItem = item => ['book','article'].includes(item.type)
+  ? publicSeoContent({books:item.type === 'book' ? [item] : [],articles:item.type === 'article' ? [item] : []})[item.type === 'book' ? 'books' : 'articles'][0]
+  : item;
+
 app.get('/api/content/:type', async (req, res) => {
   try {
     const items = await db.getPublicContent(req.params.type);
-    res.json({ items });
+    res.json({ items: items.map(publicItem) });
   } catch (error) {
     console.error('Get public content error:', error);
     res.status(500).json({ message: 'Failed to fetch content', error: error.message });
@@ -336,7 +355,7 @@ app.get('/api/content/:type/:slug', async (req, res) => {
   try {
     const item = await db.getPublicContentBySlug(req.params.type, req.params.slug);
     if (!item) return res.status(404).json({ message: 'Content not found' });
-    res.json({ item });
+    res.json({ item: publicItem(item) });
   } catch (error) {
     console.error('Get public content item error:', error);
     res.status(500).json({ message: 'Failed to fetch content item', error: error.message });
@@ -387,7 +406,8 @@ app.post('/api/admin/content', requireAdmin, async (req, res) => {
     }
     const saved = await db.createContentItem(item);
     await db.logAdminAction({ adminEmail: req.admin.email, action: 'create', entityType: 'content_item', entityId: String(saved.id), details: saved });
-    res.status(201).json({ item: saved });
+    const seo = await refreshAfterCmsSave();
+    res.status(201).json({ item: saved, seo });
   } catch (error) {
     if (error instanceof VideoValidationError) return res.status(400).json({ message: error.message });
     console.error('Create content error:', error);
@@ -404,7 +424,8 @@ app.put('/api/admin/content/:id', requireAdmin, async (req, res) => {
     const saved = await db.updateContentItem(req.params.id, item);
     if (!saved) return res.status(404).json({ message: 'Content not found' });
     await db.logAdminAction({ adminEmail: req.admin.email, action: 'update', entityType: 'content_item', entityId: String(saved.id), details: saved });
-    res.json({ item: saved });
+    const seo = await refreshAfterCmsSave();
+    res.json({ item: saved, seo });
   } catch (error) {
     if (error instanceof VideoValidationError) return res.status(400).json({ message: error.message });
     console.error('Update content error:', error);
@@ -417,7 +438,8 @@ app.delete('/api/admin/content/:id', requireAdmin, async (req, res) => {
     const saved = await db.archiveContentItem(req.params.id);
     if (!saved) return res.status(404).json({ message: 'Content not found' });
     await db.logAdminAction({ adminEmail: req.admin.email, action: 'archive', entityType: 'content_item', entityId: String(saved.id), details: saved });
-    res.json({ item: saved });
+    const seo = await refreshAfterCmsSave();
+    res.json({ item: saved, seo });
   } catch (error) {
     console.error('Archive content error:', error);
     res.status(500).json({ message: 'Failed to archive content', error: error.message });

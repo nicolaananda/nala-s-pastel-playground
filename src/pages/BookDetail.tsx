@@ -6,7 +6,8 @@ import Footer from "@/components/Footer";
 import SimpleContent from "@/components/SimpleContent";
 import Seo from "@/components/Seo";
 import CheckoutForm from "@/components/CheckoutForm";
-import { ContentItem, fetchPublicContentItem } from "@/lib/cms";
+import { ContentItem, fetchPublicContentItem, getBootContent } from "@/lib/cms";
+import { itemSchema } from '../../shared/seo.js';
 import BookVideoDialog, { SelectedBookVideo } from "@/components/BookVideoDialog";
 import { BookVideo, getBookVideos, parseYouTubeUrl } from "../../shared/book-videos.js";
 import book1Image from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg?w=800&format=webp&quality=85";
@@ -98,12 +99,14 @@ type BookView = {
   price: number;
   description: string;
   videos?: BookVideo[];
+  cmsItem?: ContentItem;
 };
 
 const cmsBookToView = (item: ContentItem): BookView => ({
+  cmsItem: item,
   title: item.title,
-  image: item.imageUrl || book1Image,
-  imageFallback: item.imageUrl || book1ImageFallback,
+  image: item.imageUrl || fallbackBooks[item.slug as keyof typeof fallbackBooks]?.image || '/placeholder.svg',
+  imageFallback: item.imageUrl || fallbackBooks[item.slug as keyof typeof fallbackBooks]?.imageFallback || '/placeholder.svg',
   price: item.price || 0,
   description: item.description,
   videos: getBookVideos(item.metadata?.videos),
@@ -111,7 +114,9 @@ const cmsBookToView = (item: ContentItem): BookView => ({
 
 const BookDetail = () => {
   const { bookId } = useParams<{ bookId: string }>();
-  const [book, setBook] = useState<BookView | null>(bookId ? fallbackBooks[bookId as keyof typeof fallbackBooks] || null : null);
+  const bootBook = () => { const item = getBootContent('book').find(item => item.slug === bookId); return item ? cmsBookToView(item) : null; };
+  const [book, setBook] = useState<BookView | null>(bootBook);
+  const [loading, setLoading] = useState(!book);
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<SelectedBookVideo | null>(null);
   const { hash } = useLocation();
@@ -123,12 +128,15 @@ const BookDetail = () => {
   useEffect(() => {
     if (!bookId) return;
     let active = true;
-    setBook(fallbackBooks[bookId as keyof typeof fallbackBooks] || null);
+    const initialItem = getBootContent("book").find(item => item.slug === bookId);
+    setBook(initialItem ? cmsBookToView(initialItem) : null);
+    setLoading(true);
     setSelectedVideo(null);
     setShowCheckout(false);
     fetchPublicContentItem("book", bookId)
       .then((item) => { if (active) setBook(cmsBookToView(item)); })
-      .catch(() => { if (active) setBook(fallbackBooks[bookId as keyof typeof fallbackBooks] || null); });
+      .catch((error) => { if (active && error.status === 404) setBook(null); })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [bookId]);
 
@@ -136,7 +144,8 @@ const BookDetail = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
         <div className="text-center">
-          <h1 className="mb-4 text-4xl font-bold">Buku Tidak Ditemukan</h1>
+          <Seo title="Buku Tidak Tersedia | Nala Art Studio" description="Buku tidak tersedia." path={`/buku/${bookId}`} noindex />
+          <h1 className="mb-4 text-4xl font-bold">{loading ? 'Memuat Buku…' : 'Buku Tidak Ditemukan'}</h1>
           <p className="mb-4 text-xl text-muted-foreground">Buku yang Anda cari tidak tersedia</p>
           <Link to="/" className="text-primary underline hover:text-primary/90">
             Kembali ke Beranda
@@ -154,7 +163,7 @@ const BookDetail = () => {
         path={`/buku/${bookId}`}
         image={book.imageFallback}
         type="product"
-        jsonLd={{ "@context": "https://schema.org", "@type": "Product", name: book.title, image: [book.imageFallback], description: book.description.replace(/\*\*/g, "").replace(/\s+/g, " ").slice(0, 300), offers: { "@type": "Offer", priceCurrency: "IDR", price: book.price, availability: "https://schema.org/InStock", url: `https://artstudionala.com/buku/${bookId}` }, brand: { "@type": "Brand", name: "Nala Art Studio" } }}
+        jsonLd={itemSchema({...book.cmsItem, imageUrl: book.imageFallback})}
       />
       <div className="container mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12">
         <Link 
@@ -168,9 +177,9 @@ const BookDetail = () => {
           <div className={`h-6 sm:h-8 ${getGradientClass(bookId || "")} rounded-t-2xl sm:rounded-t-3xl`} />
           
           <CardHeader className="p-4 sm:p-6 md:p-8">
-            <CardTitle className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-4">
               {book.title}
-            </CardTitle>
+            </h1>
             
             <div className="mb-6 overflow-hidden rounded-xl bg-muted shadow-lg sm:rounded-2xl">
               <img

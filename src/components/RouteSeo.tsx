@@ -15,6 +15,6 @@ const RouteSeo = () => {
   if (pathname.startsWith("/admin")) return <Seo title="Admin Nala Art Studio" description="Area administrasi privat." path={pathname} noindex />;
   const page = pages[pathname];
   if (!page) return null;
-  return <Seo title={page[0]} description={page[1]} path={pathname} />;
+  return <Seo title={page[0]} description={page[1]} path={pathname} noindex={["/sketch-premium", "/grasp-guide-premium", "/grasp-sixty-color-premium"].includes(pathname)} />;
 };
 export default RouteSeo;
