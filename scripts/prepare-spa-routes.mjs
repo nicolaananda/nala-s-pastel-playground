@@ -12,3 +12,6 @@ for (const route of adminRoutes) {
   await mkdir(`dist/admin/${route}`, { recursive: true });
   await copyFile('dist/index.html', `dist/admin/${route}/index.html`);
 }
+// ponytail: active competition IDs get physical shells because this LiteSpeed host ignores nested SPA rewrites.
+await mkdir('dist/admin/competitions/902/participants', { recursive: true });
+await copyFile('dist/index.html', 'dist/admin/competitions/902/participants/index.html');
