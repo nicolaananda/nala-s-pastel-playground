@@ -297,7 +297,6 @@ const AdminDashboard = () => {
             <TabsTrigger value="access">Premium Access</TabsTrigger>
             <TabsTrigger value="uploads">Uploads</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
-            <TabsTrigger value="competitions">Peserta Lomba</TabsTrigger>
           </TabsList>
 
           <TabsContent value="content" className="mt-6 grid gap-6 xl:grid-cols-[minmax(460px,560px)_1fr]">
@@ -451,6 +450,14 @@ const AdminDashboard = () => {
                     </Select>
                   </div>
 
+                  {formItem.type === "competition" && formItem.id ? (
+                    <div className="space-y-3 rounded-2xl border-2 p-4">
+                      <div className="flex items-center justify-between gap-2"><div><Label>Peserta lomba ini</Label><p className="text-xs text-muted-foreground">{registrations.filter(r => r.competitionId === formItem.id).length} pendaftar</p></div><Button type="button" size="sm" variant="outline" asChild><a href={`${import.meta.env.VITE_API_URL||''}/api/admin/competition-registrations.csv?competitionId=${formItem.id}`}>Export CSV</a></Button></div>
+                      <Input placeholder="Cari peserta, kode, atau WA…" value={registrationSearch} onChange={e=>setRegistrationSearch(e.target.value)} />
+                      <div className="max-h-80 overflow-auto"><table className="w-full text-xs"><thead><tr className="text-left"><th>Kode</th><th>Peserta</th><th>Status</th><th>Hadir</th></tr></thead><tbody>{registrations.filter(r=>r.competitionId===formItem.id&&JSON.stringify(r).toLowerCase().includes(registrationSearch.toLowerCase())).map(r=><tr key={r.id} className="border-t"><td>{r.registrationCode}</td><td>{r.participantName}<br/><small>{r.whatsapp}</small></td><td>{r.paymentStatus}{r.bookProofUrl?<><br/><a className="underline" href={r.bookProofUrl} target="_blank" rel="noreferrer">Foto buku</a></>:null}</td><td>{r.checkedInAt?'Sudah':<Button type="button" size="sm" disabled={r.paymentStatus!=='paid'} onClick={()=>adminApi.checkInCompetition(r.id).then(loadAll)}>Check-in</Button>}</td></tr>)}</tbody></table></div>
+                    </div>
+                  ) : null}
+
                   <div className="rounded-2xl border border-dashed p-3">
                     <Button type="button" variant="ghost" onClick={() => setShowAdvanced(!showAdvanced)}>{showAdvanced ? "Sembunyikan" : "Tampilkan"} Advanced JSON</Button>
                     {showAdvanced ? <div className="mt-3 space-y-2"><Label>Metadata JSON</Label><Textarea className="min-h-40 font-mono text-xs" value={metadataText} onChange={(event) => setMetadataText(event.target.value)} /></div> : null}
@@ -509,7 +516,6 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="audit"><Card><CardHeader><CardTitle>Audit Log</CardTitle></CardHeader><CardContent className="space-y-2">{logs.map((log) => <pre key={String(log.id)} className="overflow-auto rounded-xl bg-muted p-3 text-xs">{JSON.stringify(log, null, 2)}</pre>)}</CardContent></Card></TabsContent>
-          <TabsContent value="competitions"><Card><CardHeader><CardTitle>Peserta Lomba</CardTitle></CardHeader><CardContent className="space-y-4"><div className="flex gap-2"><Input placeholder="Cari peserta, kode, WA, lomba…" value={registrationSearch} onChange={e=>setRegistrationSearch(e.target.value)}/><Button asChild><a href={`${import.meta.env.VITE_API_URL||''}/api/admin/competition-registrations.csv`}>Export CSV</a></Button></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left"><th>Kode</th><th>Peserta</th><th>Lomba</th><th>WA</th><th>Bayar</th><th>Hadir</th></tr></thead><tbody>{registrations.filter(r=>JSON.stringify(r).toLowerCase().includes(registrationSearch.toLowerCase())).map(r=><tr key={r.id} className="border-t"><td>{r.registrationCode}</td><td>{r.participantName}<br/><small>{r.parentName}</small></td><td>{r.competitionTitle}</td><td>{r.whatsapp}</td><td>{r.paymentStatus}{r.bookProofUrl?<><br/><a className="underline" href={r.bookProofUrl} target="_blank" rel="noreferrer">Lihat foto buku</a></>:null}</td><td>{r.checkedInAt?'Sudah':<Button size="sm" disabled={r.paymentStatus!=='paid'} onClick={()=>adminApi.checkInCompetition(r.id).then(loadAll)}>Check-in</Button>}</td></tr>)}</tbody></table></div></CardContent></Card></TabsContent>
         </Tabs>
       </div>
     </main>
