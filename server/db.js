@@ -263,6 +263,7 @@ export const initDatabase = async () => {
         competition_id INTEGER NOT NULL REFERENCES content_items(id),
         order_id VARCHAR(255) UNIQUE NOT NULL,
         registration_code VARCHAR(50) UNIQUE NOT NULL,
+        access_token VARCHAR(64) UNIQUE,
         participant_name VARCHAR(255) NOT NULL,
         birth_date DATE NOT NULL,
         school_name VARCHAR(255),
@@ -282,6 +283,8 @@ export const initDatabase = async () => {
       CREATE INDEX IF NOT EXISTS idx_competition_registrations_competition ON competition_registrations(competition_id, payment_status);
     `);
     await pool.query(`ALTER TABLE competition_registrations ADD COLUMN IF NOT EXISTS book_proof_url TEXT`);
+    await pool.query(`ALTER TABLE competition_registrations ADD COLUMN IF NOT EXISTS access_token VARCHAR(64)`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_competition_access_token ON competition_registrations(access_token)`);
 
     for (const item of defaultContentItems) {
       await pool.query(
@@ -673,17 +676,23 @@ export const db = {
 
   async createCompetitionRegistration(data) {
     if (useMemoryDb) {
-      const row = { id: memoryCompetitionRegistrations.length + 1, competition_id: data.competitionId, order_id: data.orderId, registration_code: data.registrationCode, participant_name: data.participantName, birth_date: data.birthDate, school_name: data.schoolName, parent_name: data.parentName, whatsapp: data.whatsapp, email: data.email, book_proof_url: data.bookProofUrl, amount: data.amount, payment_status: 'pending', expires_at: data.expiresAt, competition_title: data.competitionTitle, created_at: new Date() };
+      const row = { id: memoryCompetitionRegistrations.length + 1, competition_id: data.competitionId, order_id: data.orderId, registration_code: data.registrationCode, access_token: data.accessToken, participant_name: data.participantName, birth_date: data.birthDate, school_name: data.schoolName, parent_name: data.parentName, whatsapp: data.whatsapp, email: data.email, book_proof_url: data.bookProofUrl, amount: data.amount, payment_status: 'pending', expires_at: data.expiresAt, competition_title: data.competitionTitle, created_at: new Date() };
       memoryCompetitionRegistrations.unshift(row);
       return this.competitionRegistrationToJson(row);
     }
-    const result = await pool.query(`INSERT INTO competition_registrations (competition_id,order_id,registration_code,participant_name,birth_date,school_name,parent_name,whatsapp,email,book_proof_url,amount,expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`, [data.competitionId,data.orderId,data.registrationCode,data.participantName,data.birthDate,data.schoolName||null,data.parentName,data.whatsapp,data.email,data.bookProofUrl||null,data.amount,data.expiresAt]);
+    const result = await pool.query(`INSERT INTO competition_registrations (competition_id,order_id,registration_code,access_token,participant_name,birth_date,school_name,parent_name,whatsapp,email,book_proof_url,amount,expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`, [data.competitionId,data.orderId,data.registrationCode,data.accessToken,data.participantName,data.birthDate,data.schoolName||null,data.parentName,data.whatsapp,data.email,data.bookProofUrl||null,data.amount,data.expiresAt]);
     return this.competitionRegistrationToJson(result.rows[0]);
   },
 
   async getCompetitionRegistrationByOrder(orderId) {
     if (useMemoryDb) { const row=memoryCompetitionRegistrations.find((item)=>item.order_id===orderId); return row ? this.competitionRegistrationToJson(row) : null; }
     const result=await pool.query(`SELECT r.*,c.title AS competition_title,c.slug AS competition_slug FROM competition_registrations r JOIN content_items c ON c.id=r.competition_id WHERE r.order_id=$1 LIMIT 1`,[orderId]);
+    return result.rows[0] ? this.competitionRegistrationToJson(result.rows[0]) : null;
+  },
+
+  async getCompetitionRegistrationByToken(token) {
+    if (useMemoryDb) { const row=memoryCompetitionRegistrations.find((item)=>item.access_token===token); return row ? this.competitionRegistrationToJson(row) : null; }
+    const result=await pool.query(`SELECT r.*,c.title AS competition_title,c.slug AS competition_slug,c.metadata AS competition_metadata FROM competition_registrations r JOIN content_items c ON c.id=r.competition_id WHERE r.access_token=$1 LIMIT 1`,[token]);
     return result.rows[0] ? this.competitionRegistrationToJson(result.rows[0]) : null;
   },
 
@@ -706,7 +715,7 @@ export const db = {
   },
 
   competitionRegistrationToJson(row) {
-    return { id:row.id, competitionId:row.competition_id, competitionTitle:row.competition_title||'', competitionSlug:row.competition_slug||'', orderId:row.order_id, registrationCode:row.registration_code, participantName:row.participant_name, birthDate:row.birth_date, schoolName:row.school_name||'', parentName:row.parent_name, whatsapp:row.whatsapp, email:row.email, bookProofUrl:row.book_proof_url||null, amount:row.amount, paymentStatus:row.payment_status, transactionId:row.transaction_id||null, checkedInAt:row.checked_in_at?.toISOString?.()||row.checked_in_at||null, paidAt:row.paid_at?.toISOString?.()||row.paid_at||null, expiresAt:row.expires_at?.toISOString?.()||row.expires_at, createdAt:row.created_at?.toISOString?.()||row.created_at };
+    return { id:row.id, competitionId:row.competition_id, competitionTitle:row.competition_title||'', competitionSlug:row.competition_slug||'', competitionMetadata:row.competition_metadata||{}, accessToken:row.access_token||null, orderId:row.order_id, registrationCode:row.registration_code, participantName:row.participant_name, birthDate:row.birth_date, schoolName:row.school_name||'', parentName:row.parent_name, whatsapp:row.whatsapp, email:row.email, bookProofUrl:row.book_proof_url||null, amount:row.amount, paymentStatus:row.payment_status, transactionId:row.transaction_id||null, checkedInAt:row.checked_in_at?.toISOString?.()||row.checked_in_at||null, paidAt:row.paid_at?.toISOString?.()||row.paid_at||null, expiresAt:row.expires_at?.toISOString?.()||row.expires_at, createdAt:row.created_at?.toISOString?.()||row.created_at };
   },
 
   contentRowToJson(row) {

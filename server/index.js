@@ -577,11 +577,14 @@ app.post('/api/competitions/:slug/register', async (req,res) => {
     const suffix=crypto.randomBytes(5).toString('hex').toUpperCase();
     const orderId=`LOMBA-${Date.now()}-${suffix}`;
     const registrationCode=`NALA-${suffix}`;
-    const registration=await db.createCompetitionRegistration({competitionId:competition.id,competitionTitle:competition.title,orderId,registrationCode,participantName:participantName.trim(),birthDate,schoolName:schoolName?.trim(),parentName:parentName.trim(),whatsapp:phone,email:email.trim().toLowerCase(),bookProofUrl:validProof?bookProofUrl:null,amount,expiresAt:new Date(Date.now()+15*60*1000)});
+    const accessToken=crypto.randomBytes(24).toString('hex');
+    const registration=await db.createCompetitionRegistration({competitionId:competition.id,competitionTitle:competition.title,orderId,registrationCode,accessToken,participantName:participantName.trim(),birthDate,schoolName:schoolName?.trim(),parentName:parentName.trim(),whatsapp:phone,email:email.trim().toLowerCase(),bookProofUrl:validProof?bookProofUrl:null,amount,expiresAt:new Date(Date.now()+15*60*1000)});
     const transaction=await snap.createTransaction({transaction_details:{order_id:orderId,gross_amount:amount},item_details:[{id:`lomba-${competition.id}`,price:amount,quantity:1,name:competition.title.slice(0,50)}],customer_details:{first_name:parentName.trim(),email:email.trim().toLowerCase(),phone},custom_field1:`Peserta: ${participantName.trim()}`,custom_field2:`Kode: ${registrationCode}`,enabled_payments:['qris','other_qris'],callbacks:{finish:`https://artstudionala.com/lomba/${competition.slug}?order=${encodeURIComponent(orderId)}`},expiry:{unit:'minutes',duration:15}});
-    res.status(201).json({registration,paymentUrl:transaction.redirect_url});
+    res.status(201).json({accessToken,token:transaction.token,paymentUrl:transaction.redirect_url});
   } catch(error) { console.error('Competition registration error:',error); res.status(500).json({message:'Gagal membuat pendaftaran'}); }
 });
+
+app.get('/api/competition-registration/:accessToken',async(req,res)=>{const r=await db.getCompetitionRegistrationByToken(req.params.accessToken);if(!r)return res.status(404).json({message:'Pendaftaran tidak ditemukan'});res.set('Cache-Control','no-store').json({registration:{competitionTitle:r.competitionTitle,competitionSlug:r.competitionSlug,eventDate:r.competitionMetadata?.eventDate||'',location:r.competitionMetadata?.location||'',registrationCode:r.registrationCode,participantName:r.participantName,orderId:r.orderId,amount:r.amount,paymentStatus:r.paymentStatus,paidAt:r.paidAt,createdAt:r.createdAt}});});
 
 app.get('/api/admin/competition-registrations',requireAdmin,async(req,res)=>{const all=await db.getCompetitionRegistrations();const registrations=req.query.competitionId?all.filter(r=>String(r.competitionId)===String(req.query.competitionId)):all;res.json({registrations});});
 app.post('/api/admin/competition-registrations/:id/check-in',requireAdmin,async(req,res)=>{const registration=await db.checkInCompetitionRegistration(req.params.id); if(!registration)return res.status(409).json({message:'Peserta belum lunas atau tidak ditemukan'}); res.json({registration});});

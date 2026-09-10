@@ -17,6 +17,7 @@ const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const Competitions = lazy(() => import("./pages/Competitions"));
 const CompetitionDetail = lazy(() => import("./pages/CompetitionDetail"));
+const CompetitionConfirmation = lazy(() => import("./pages/CompetitionConfirmation"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const PageFallback = (
@@ -45,6 +46,7 @@ const App = () => (
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/lomba" element={<Competitions />} />
           <Route path="/lomba/:slug" element={<CompetitionDetail />} />
+          <Route path="/lomba/:slug/konfirmasi/:accessToken" element={<CompetitionConfirmation />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
