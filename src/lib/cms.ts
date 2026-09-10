@@ -20,7 +20,7 @@ export interface ContentItem {
   updatedAt?: string;
 }
 
-export interface CompetitionRegistration { id:number; competitionTitle:string; registrationCode:string; participantName:string; birthDate:string; schoolName:string; parentName:string; whatsapp:string; email:string; bookProofUrl?:string|null; amount:number; paymentStatus:string; checkedInAt?:string|null; createdAt:string }
+export interface CompetitionRegistration { id:number; competitionId:number; competitionTitle:string; registrationCode:string; participantName:string; birthDate:string; schoolName:string; parentName:string; whatsapp:string; email:string; bookProofUrl?:string|null; amount:number; paymentStatus:string; transactionId?:string|null; checkedInAt?:string|null; archivedAt?:string|null; createdAt:string }
 
 export interface MediaItem {
   id: number;
@@ -120,8 +120,11 @@ export const adminApi = {
   restoreCode: (code: string) => requestJson<{ record: AccessRecord }>(`/api/admin/access-codes/${code}/restore`, { method: "POST" }),
   generateCode: (orderId: string) => requestJson<{ code: string }>(`/api/transaction/${orderId}/generate-code`, { method: "POST", body: JSON.stringify({}) }),
   auditLogs: () => requestJson<{ logs: Array<Record<string, unknown>> }>("/api/admin/audit-logs"),
-  competitionRegistrations: () => requestJson<{ registrations: CompetitionRegistration[] }>("/api/admin/competition-registrations"),
-  checkInCompetition: (id:number) => requestJson<{ registration: CompetitionRegistration }>(`/api/admin/competition-registrations/${id}/check-in`, {method:"POST",body:"{}"}),
+  competitionRegistrations: (competitionId?: number, archived = false) => requestJson<{ registrations: CompetitionRegistration[] }>(`/api/admin/competition-registrations${competitionId ? `?competitionId=${competitionId}&archived=${archived}` : ""}`),
+  createCompetitionRegistration: (competitionId:number, data:Record<string, unknown>) => requestJson<{registration:CompetitionRegistration}>(`/api/admin/competitions/${competitionId}/participants`,{method:"POST",body:JSON.stringify(data)}),
+  updateCompetitionRegistration: (competitionId:number,id:number,data:Record<string, unknown>) => requestJson<{registration:CompetitionRegistration}>(`/api/admin/competitions/${competitionId}/participants/${id}`,{method:"PATCH",body:JSON.stringify(data)}),
+  archiveCompetitionRegistration: (competitionId:number,id:number) => requestJson<{registration:CompetitionRegistration}>(`/api/admin/competitions/${competitionId}/participants/${id}/archive`,{method:"POST",body:"{}"}),
+  checkInCompetition: (competitionId:number,id:number) => requestJson<{ registration: CompetitionRegistration }>(`/api/admin/competitions/${competitionId}/participants/${id}/check-in`, {method:"POST",body:"{}"}),
   media: () => requestJson<{ media: MediaItem[] }>("/api/admin/media"),
   deleteMedia: (id: number) => requestJson<{ success: true }>(`/api/admin/media/${id}`, { method: "DELETE" }),
   registerUpload: (url: string, title: string, type: string) => requestJson<{ upload: { url: string; title: string; type: string } }>("/api/admin/uploads", {

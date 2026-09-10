@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,6 +15,7 @@ const SketchPurchase = lazy(() => import("./pages/SketchPurchase"));
 const SketchPremium = lazy(() => import("./pages/SketchPremium"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AdminCompetitionParticipants = lazy(() => import("./pages/AdminCompetitionParticipants"));
 const Competitions = lazy(() => import("./pages/Competitions"));
 const CompetitionDetail = lazy(() => import("./pages/CompetitionDetail"));
 const CompetitionConfirmation = lazy(() => import("./pages/CompetitionConfirmation"));
@@ -43,7 +44,9 @@ const App = () => (
           <Route path="/sketch-purchase" element={<SketchPurchase />} />
           <Route path="/sketch-premium" element={<SketchPremium />} />
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin" element={<Navigate to="/admin/content" replace />} />
+          <Route path="/admin/competitions/:competitionId/participants" element={<AdminCompetitionParticipants />} />
+          <Route path="/admin/:module" element={<AdminDashboard />} />
           <Route path="/lomba" element={<Competitions />} />
           <Route path="/lomba/:slug" element={<CompetitionDetail />} />
           <Route path="/lomba/:slug/konfirmasi/:accessToken" element={<CompetitionConfirmation />} />

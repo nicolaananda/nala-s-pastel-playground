@@ -27,7 +27,7 @@
     # Registered static SPA routes remain available.
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_URI} ^/(berita-lomba|grasp-guide-premium|grasp-sixty-color-premium|sketch-purchase|sketch-premium|admin(?:/login)?)?/?$
+    RewriteCond %{REQUEST_URI} ^/(berita-lomba|grasp-guide-premium|grasp-sixty-color-premium|sketch-purchase|sketch-premium|admin(?:/(?:login|content|competitions|premium-access|uploads|audit)|/competitions/[0-9]+/participants)?)?/?$
     RewriteRule . /index.html [L]
 
     # Path lain adalah 404 asli, bukan soft 404.

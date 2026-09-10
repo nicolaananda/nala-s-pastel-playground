@@ -1,0 +1,24 @@
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { adminApi, CompetitionRegistration } from "@/lib/cms";
+
+const empty = { participantName:"", birthDate:"", schoolName:"", parentName:"", whatsapp:"", email:"" };
+export default function AdminCompetitionParticipants(){
+  const competitionId=Number(useParams().competitionId); const navigate=useNavigate();
+  const [rows,setRows]=useState<CompetitionRegistration[]>([]); const [archived,setArchived]=useState(false); const [search,setSearch]=useState(""); const [form,setForm]=useState(empty); const [editing,setEditing]=useState<number>();
+  const load=()=>adminApi.competitionRegistrations(competitionId,archived).then(x=>setRows(x.registrations));
+  useEffect(()=>{if(!Number.isInteger(competitionId)||competitionId<1){navigate('/admin/competitions');return;}load().catch(()=>navigate('/admin/login'));},[competitionId,archived]);
+  const visible=useMemo(()=>rows.filter(r=>JSON.stringify(r).toLowerCase().includes(search.toLowerCase())),[rows,search]);
+  const submit=async(e:FormEvent)=>{e.preventDefault();try{if(editing)await adminApi.updateCompetitionRegistration(competitionId,editing,form);else await adminApi.createCompetitionRegistration(competitionId,form);setForm(empty);setEditing(undefined);await load();toast.success(editing?'Peserta diperbarui':'Peserta manual ditambahkan');}catch(error){toast.error(error instanceof Error?error.message:'Gagal menyimpan');}};
+  const edit=(r:CompetitionRegistration)=>{setEditing(r.id);setForm({participantName:r.participantName,birthDate:String(r.birthDate).slice(0,10),schoolName:r.schoolName,parentName:r.parentName,whatsapp:r.whatsapp,email:r.email});};
+  return <main className="min-h-screen bg-[#fff8ef] p-4 sm:p-8"><div className="mx-auto max-w-7xl space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><Button variant="ghost" asChild><Link to="/admin/competitions">← Kompetisi</Link></Button><h1 className="text-3xl font-black">Peserta kompetisi #{competitionId}</h1></div><Button asChild><a href={`${import.meta.env.VITE_API_URL||''}/api/admin/competitions/${competitionId}/participants.csv?archived=${archived}`}>Export CSV</a></Button></div>
+    <Card><CardHeader><CardTitle>{editing?'Edit data aman':'Tambah pendaftaran manual gratis'}</CardTitle></CardHeader><CardContent><form onSubmit={submit} className="grid gap-3 md:grid-cols-3">{([['participantName','Nama peserta','text'],['birthDate','Tanggal lahir','date'],['schoolName','Sekolah','text'],['parentName','Nama orang tua','text'],['whatsapp','WhatsApp','tel'],['email','Email','email']] as const).map(([key,label,type])=><div key={key}><Label htmlFor={key}>{label}</Label><Input id={key} type={type} required={key!=='schoolName'} value={form[key]} onChange={e=>setForm({...form,[key]:e.target.value})}/></div>)}<div className="flex gap-2 md:col-span-3"><Button type="submit">{editing?'Simpan':'Tambah sebagai lunas manual'}</Button>{editing?<Button type="button" variant="outline" onClick={()=>{setEditing(undefined);setForm(empty)}}>Batal</Button>:null}</div></form></CardContent></Card>
+    <Card><CardContent className="space-y-4 pt-6"><div className="flex flex-wrap gap-2"><Input className="max-w-md" aria-label="Cari peserta" placeholder="Cari nama, kode, WhatsApp…" value={search} onChange={e=>setSearch(e.target.value)}/><Button variant={archived?'outline':'default'} onClick={()=>setArchived(false)}>Aktif</Button><Button variant={archived?'default':'outline'} onClick={()=>setArchived(true)}>Arsip</Button></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left"><th>Kode</th><th>Peserta</th><th>Kontak</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{visible.map(r=><tr key={r.id} className="border-t"><td>{r.registrationCode}</td><td>{r.participantName}<br/><small>{r.birthDate} · {r.schoolName}</small></td><td>{r.parentName}<br/><small>{r.whatsapp} · {r.email}</small></td><td>{r.paymentStatus}{r.checkedInAt?' · hadir':''}</td><td className="flex flex-wrap gap-1 py-2">{!archived?<><Button size="sm" variant="outline" onClick={()=>edit(r)}>Edit</Button><Button size="sm" disabled={r.paymentStatus!=='paid'||Boolean(r.checkedInAt)} onClick={()=>adminApi.checkInCompetition(competitionId,r.id).then(load)}>Check-in</Button><Button size="sm" variant="destructive" onClick={()=>window.confirm(`Arsipkan ${r.participantName}?`)&&adminApi.archiveCompetitionRegistration(competitionId,r.id).then(load)}>Arsip</Button></>:null}</td></tr>)}</tbody></table></div></CardContent></Card>
+  </div></main>;
+}

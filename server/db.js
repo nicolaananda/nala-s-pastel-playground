@@ -275,6 +275,7 @@ export const initDatabase = async () => {
         payment_status VARCHAR(30) NOT NULL DEFAULT 'pending',
         transaction_id VARCHAR(255),
         checked_in_at TIMESTAMP,
+        archived_at TIMESTAMP,
         paid_at TIMESTAMP,
         expires_at TIMESTAMP NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -284,6 +285,7 @@ export const initDatabase = async () => {
     `);
     await pool.query(`ALTER TABLE competition_registrations ADD COLUMN IF NOT EXISTS book_proof_url TEXT`);
     await pool.query(`ALTER TABLE competition_registrations ADD COLUMN IF NOT EXISTS access_token VARCHAR(64)`);
+    await pool.query(`ALTER TABLE competition_registrations ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP`);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_competition_access_token ON competition_registrations(access_token)`);
 
     for (const item of defaultContentItems) {
@@ -702,20 +704,28 @@ export const db = {
     return result.rows[0] ? this.competitionRegistrationToJson(result.rows[0]) : null;
   },
 
-  async getCompetitionRegistrations() {
-    if (useMemoryDb) return memoryCompetitionRegistrations.map((row)=>this.competitionRegistrationToJson(row));
-    const result=await pool.query(`SELECT r.*,c.title AS competition_title,c.slug AS competition_slug FROM competition_registrations r JOIN content_items c ON c.id=r.competition_id ORDER BY r.created_at DESC`);
+  async getCompetitionRegistrations(competitionId, archived = false) {
+    if (useMemoryDb) return memoryCompetitionRegistrations.filter(row=>(!competitionId||String(row.competition_id)===String(competitionId)) && Boolean(row.archived_at)===archived).map((row)=>this.competitionRegistrationToJson(row));
+    const result=await pool.query(`SELECT r.*,c.title AS competition_title,c.slug AS competition_slug FROM competition_registrations r JOIN content_items c ON c.id=r.competition_id WHERE ($1::int IS NULL OR r.competition_id=$1) AND (($2::boolean AND r.archived_at IS NOT NULL) OR (NOT $2::boolean AND r.archived_at IS NULL)) ORDER BY r.created_at DESC`,[competitionId||null,archived]);
     return result.rows.map((row)=>this.competitionRegistrationToJson(row));
   },
 
-  async checkInCompetitionRegistration(id) {
-    if (useMemoryDb) { const row=memoryCompetitionRegistrations.find((item)=>String(item.id)===String(id)); if(!row||row.payment_status!=='paid')return null; row.checked_in_at=row.checked_in_at||new Date(); return this.competitionRegistrationToJson(row); }
-    const result=await pool.query(`UPDATE competition_registrations SET checked_in_at=COALESCE(checked_in_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND payment_status='paid' RETURNING *`,[id]);
+  async updateCompetitionRegistration(competitionId,id,data) {
+    if(useMemoryDb){const row=memoryCompetitionRegistrations.find(r=>String(r.id)===String(id)&&String(r.competition_id)===String(competitionId));if(!row)return null;Object.assign(row,{participant_name:data.participantName,birth_date:data.birthDate,school_name:data.schoolName,parent_name:data.parentName,whatsapp:data.whatsapp,email:data.email,updated_at:new Date()});return this.competitionRegistrationToJson(row);}
+    const result=await pool.query(`UPDATE competition_registrations SET participant_name=$3,birth_date=$4,school_name=$5,parent_name=$6,whatsapp=$7,email=$8,updated_at=CURRENT_TIMESTAMP WHERE competition_id=$1 AND id=$2 AND archived_at IS NULL RETURNING *`,[competitionId,id,data.participantName,data.birthDate,data.schoolName||null,data.parentName,data.whatsapp,data.email]);return result.rows[0]?this.competitionRegistrationToJson(result.rows[0]):null;
+  },
+  async archiveCompetitionRegistration(competitionId,id) {
+    if(useMemoryDb){const row=memoryCompetitionRegistrations.find(r=>String(r.id)===String(id)&&String(r.competition_id)===String(competitionId));if(!row)return null;row.archived_at=row.archived_at||new Date();return this.competitionRegistrationToJson(row);}
+    const result=await pool.query(`UPDATE competition_registrations SET archived_at=COALESCE(archived_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE competition_id=$1 AND id=$2 RETURNING *`,[competitionId,id]);return result.rows[0]?this.competitionRegistrationToJson(result.rows[0]):null;
+  },
+  async checkInCompetitionRegistration(competitionId,id) {
+    if (useMemoryDb) { const row=memoryCompetitionRegistrations.find((item)=>String(item.id)===String(id)&&String(item.competition_id)===String(competitionId)); if(!row||row.payment_status!=='paid'||row.archived_at)return null; row.checked_in_at=row.checked_in_at||new Date(); return this.competitionRegistrationToJson(row); }
+    const result=await pool.query(`UPDATE competition_registrations SET checked_in_at=COALESCE(checked_in_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE competition_id=$1 AND id=$2 AND payment_status='paid' AND archived_at IS NULL RETURNING *`,[competitionId,id]);
     return result.rows[0] ? this.competitionRegistrationToJson(result.rows[0]) : null;
   },
 
   competitionRegistrationToJson(row) {
-    return { id:row.id, competitionId:row.competition_id, competitionTitle:row.competition_title||'', competitionSlug:row.competition_slug||'', competitionMetadata:row.competition_metadata||{}, accessToken:row.access_token||null, orderId:row.order_id, registrationCode:row.registration_code, participantName:row.participant_name, birthDate:row.birth_date, schoolName:row.school_name||'', parentName:row.parent_name, whatsapp:row.whatsapp, email:row.email, bookProofUrl:row.book_proof_url||null, amount:row.amount, paymentStatus:row.payment_status, transactionId:row.transaction_id||null, checkedInAt:row.checked_in_at?.toISOString?.()||row.checked_in_at||null, paidAt:row.paid_at?.toISOString?.()||row.paid_at||null, expiresAt:row.expires_at?.toISOString?.()||row.expires_at, createdAt:row.created_at?.toISOString?.()||row.created_at };
+    return { id:row.id, competitionId:row.competition_id, competitionTitle:row.competition_title||'', competitionSlug:row.competition_slug||'', competitionMetadata:row.competition_metadata||{}, accessToken:row.access_token||null, orderId:row.order_id, registrationCode:row.registration_code, participantName:row.participant_name, birthDate:row.birth_date, schoolName:row.school_name||'', parentName:row.parent_name, whatsapp:row.whatsapp, email:row.email, bookProofUrl:row.book_proof_url||null, amount:row.amount, paymentStatus:row.payment_status, transactionId:row.transaction_id||null, checkedInAt:row.checked_in_at?.toISOString?.()||row.checked_in_at||null, archivedAt:row.archived_at?.toISOString?.()||row.archived_at||null, paidAt:row.paid_at?.toISOString?.()||row.paid_at||null, expiresAt:row.expires_at?.toISOString?.()||row.expires_at, createdAt:row.created_at?.toISOString?.()||row.created_at };
   },
 
   contentRowToJson(row) {

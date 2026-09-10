@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,12 +57,14 @@ const clampExcerpt = (value: string) => value.replace(/<[^>]+>/g, "").replace(/\
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { module = "content" } = useParams();
+  const modules = ["content","competitions","premium-access","uploads","audit"];
   const [adminEmail, setAdminEmail] = useState("");
   const [items, setItems] = useState<ContentItem[]>([]);
   const [transactions, setTransactions] = useState<AccessRecord[]>([]);
   const [logs, setLogs] = useState<Array<Record<string, unknown>>>([]);
   const [registrations,setRegistrations]=useState<CompetitionRegistration[]>([]);
-  const [registrationSearch,setRegistrationSearch]=useState("");
+
   const [selectedType, setSelectedType] = useState<ContentType>("book");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ContentItem["status"]>("all");
@@ -291,10 +293,11 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="content">
+        <Tabs value={modules.includes(module) ? module : "content"} onValueChange={(value)=>navigate(`/admin/${value}`)}>
           <TabsList className="sticky top-3 z-10 flex h-auto flex-wrap justify-start rounded-full border-2 border-[#2b2118] bg-white/90 p-2 shadow-[6px_6px_0_#2b2118] backdrop-blur">
             <TabsTrigger value="content">Konten</TabsTrigger>
-            <TabsTrigger value="access">Premium Access</TabsTrigger>
+            <TabsTrigger value="competitions">Lomba</TabsTrigger>
+            <TabsTrigger value="premium-access">Premium Access</TabsTrigger>
             <TabsTrigger value="uploads">Uploads</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
           </TabsList>
@@ -453,9 +456,8 @@ const AdminDashboard = () => {
 
                   {formItem.type === "competition" && formItem.id ? (
                     <div className="space-y-3 rounded-2xl border-2 p-4">
-                      <div className="flex items-center justify-between gap-2"><div><Label>Peserta lomba ini</Label><p className="text-xs text-muted-foreground">{registrations.filter(r => r.competitionId === formItem.id).length} pendaftar</p></div><Button type="button" size="sm" variant="outline" asChild><a href={`${import.meta.env.VITE_API_URL||''}/api/admin/competition-registrations.csv?competitionId=${formItem.id}`}>Export CSV</a></Button></div>
-                      <Input placeholder="Cari peserta, kode, atau WA…" value={registrationSearch} onChange={e=>setRegistrationSearch(e.target.value)} />
-                      <div className="max-h-80 overflow-auto"><table className="w-full text-xs"><thead><tr className="text-left"><th>Kode</th><th>Peserta</th><th>Status</th><th>Hadir</th></tr></thead><tbody>{registrations.filter(r=>r.competitionId===formItem.id&&JSON.stringify(r).toLowerCase().includes(registrationSearch.toLowerCase())).map(r=><tr key={r.id} className="border-t"><td>{r.registrationCode}</td><td>{r.participantName}<br/><small>{r.whatsapp}</small></td><td>{r.paymentStatus}{r.bookProofUrl?<><br/><a className="underline" href={r.bookProofUrl} target="_blank" rel="noreferrer">Foto buku</a></>:null}</td><td>{r.checkedInAt?'Sudah':<Button type="button" size="sm" disabled={r.paymentStatus!=='paid'} onClick={()=>adminApi.checkInCompetition(r.id).then(loadAll)}>Check-in</Button>}</td></tr>)}</tbody></table></div>
+                      <div><Label>Peserta lomba ini</Label><p className="text-xs text-muted-foreground">{registrations.filter(r => r.competitionId === formItem.id).length} pendaftar</p></div>
+                      <Button type="button" asChild><Link to={`/admin/competitions/${formItem.id}/participants`}>Kelola peserta</Link></Button>
                     </div>
                   ) : null}
 
@@ -506,7 +508,9 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="access" className="space-y-4">
+          <TabsContent value="competitions" className="space-y-4"><Card><CardHeader><CardTitle>Kompetisi</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2">{items.filter(item=>item.type==="competition").map(item=><div key={item.id} className="rounded-xl border p-4"><b>{item.title}</b><p className="text-sm text-muted-foreground">{item.status}</p><Button className="mt-3" asChild><Link to={`/admin/competitions/${item.id}/participants`}>Kelola peserta</Link></Button></div>)}</CardContent></Card></TabsContent>
+
+          <TabsContent value="premium-access" className="space-y-4">
             <Card><CardHeader><CardTitle>Generate Kode Manual</CardTitle></CardHeader><CardContent className="flex gap-2"><Input placeholder="Order ID" value={manualOrderId} onChange={(event) => setManualOrderId(event.target.value)} /><Button onClick={generateCode}>Generate</Button></CardContent></Card>
             <Card><CardHeader><CardTitle>Premium Access Codes</CardTitle></CardHeader><CardContent className="space-y-3">{transactions.map((record) => <div key={`${record.transactionId}-${record.code}`} className="rounded-xl border p-3 text-sm"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><b>{record.code}</b> · {record.orderId} · {record.customer?.email || "no email"}{record.revokedAt ? <span className="ml-2 text-destructive">revoked</span> : null}</div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => adminApi.restoreCode(record.code).then(loadAll)}>Restore</Button><Button size="sm" variant="destructive" onClick={() => adminApi.revokeCode(record.code, "Admin revoke").then(loadAll)}>Revoke</Button></div></div></div>)}</CardContent></Card>
           </TabsContent>

@@ -1,0 +1,2 @@
+ALTER TABLE competition_registrations ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP;
+CREATE INDEX IF NOT EXISTS idx_competition_registrations_scope ON competition_registrations(competition_id, archived_at, created_at DESC);
