@@ -2,7 +2,7 @@ import { publicSeoContent } from '../../shared/seo.js';
 
 export type ContentStatus = "draft" | "published" | "archived";
 
-export type ContentType = "book" | "article" | "grasp_asset" | "premium_product" | "merchandise";
+export type ContentType = "book" | "article" | "grasp_asset" | "premium_product" | "merchandise" | "competition";
 
 export interface ContentItem {
   id?: number;
@@ -19,6 +19,8 @@ export interface ContentItem {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export interface CompetitionRegistration { id:number; competitionTitle:string; registrationCode:string; participantName:string; birthDate:string; schoolName:string; parentName:string; whatsapp:string; email:string; bookProofUrl?:string|null; amount:number; paymentStatus:string; checkedInAt?:string|null; createdAt:string }
 
 export interface MediaItem {
   id: number;
@@ -118,6 +120,8 @@ export const adminApi = {
   restoreCode: (code: string) => requestJson<{ record: AccessRecord }>(`/api/admin/access-codes/${code}/restore`, { method: "POST" }),
   generateCode: (orderId: string) => requestJson<{ code: string }>(`/api/transaction/${orderId}/generate-code`, { method: "POST", body: JSON.stringify({}) }),
   auditLogs: () => requestJson<{ logs: Array<Record<string, unknown>> }>("/api/admin/audit-logs"),
+  competitionRegistrations: () => requestJson<{ registrations: CompetitionRegistration[] }>("/api/admin/competition-registrations"),
+  checkInCompetition: (id:number) => requestJson<{ registration: CompetitionRegistration }>(`/api/admin/competition-registrations/${id}/check-in`, {method:"POST",body:"{}"}),
   media: () => requestJson<{ media: MediaItem[] }>("/api/admin/media"),
   deleteMedia: (id: number) => requestJson<{ success: true }>(`/api/admin/media/${id}`, { method: "DELETE" }),
   registerUpload: (url: string, title: string, type: string) => requestJson<{ upload: { url: string; title: string; type: string } }>("/api/admin/uploads", {

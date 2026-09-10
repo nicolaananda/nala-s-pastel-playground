@@ -15,6 +15,8 @@ const SketchPurchase = lazy(() => import("./pages/SketchPurchase"));
 const SketchPremium = lazy(() => import("./pages/SketchPremium"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const Competitions = lazy(() => import("./pages/Competitions"));
+const CompetitionDetail = lazy(() => import("./pages/CompetitionDetail"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const PageFallback = (
@@ -41,6 +43,8 @@ const App = () => (
           <Route path="/sketch-premium" element={<SketchPremium />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/lomba" element={<Competitions />} />
+          <Route path="/lomba/:slug" element={<CompetitionDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

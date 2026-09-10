@@ -541,6 +541,52 @@ app.get('/api/midtrans/debug', (req, res) => {
   });
 });
 
+const normalizeWhatsapp = (value='') => String(value).replace(/\D/g,'').replace(/^0/,'62');
+const validEmail = (value='') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+app.post('/api/competitions/:slug/book-proof', async (req,res) => {
+  try {
+    const competition=await db.getPublicContentBySlug('competition',req.params.slug);
+    if(!competition || competition.metadata?.bookRequirement==='none') return res.status(404).json({message:'Upload bukti tidak tersedia'});
+    const upload=await optimizeUpload(await parseMultipartUpload(req));
+    if(!upload.contentType.startsWith('image/')) return res.status(400).json({message:'Bukti harus berupa foto JPG, PNG, WebP, atau GIF'});
+    const filename=`competition-proofs/${Date.now()}-${crypto.randomBytes(8).toString('hex')}${upload.ext}`;
+    let url=await uploadToR2({key:filename,buffer:upload.buffer,contentType:upload.contentType});
+    if(!url){if(process.env.NODE_ENV==='production')throw new Error('Penyimpanan bukti belum dikonfigurasi');await fs.mkdir(uploadDir,{recursive:true});const local=path.basename(filename);await fs.writeFile(path.join(uploadDir,local),upload.buffer);url=`${(process.env.PUBLIC_API_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'')}/uploads/${local}`;}
+    res.json({url});
+  } catch(error){console.error('Book proof upload error:',error);res.status(400).json({message:error.message||'Upload bukti gagal'});}
+});
+
+app.post('/api/competitions/:slug/register', async (req,res) => {
+  try {
+    const competition=await db.getPublicContentBySlug('competition',req.params.slug);
+    if(!competition) return res.status(404).json({message:'Lomba tidak ditemukan'});
+    const {participantName,birthDate,schoolName,parentName,whatsapp,email,consent,bookProofUrl}=req.body||{};
+    const phone=normalizeWhatsapp(whatsapp);
+    const bookRequirement=String(competition.metadata?.bookRequirement||'none');
+    const proofBase=(r2Config()?.publicUrl||process.env.PUBLIC_API_URL||'').replace(/\/$/,'');
+    const validProof=typeof bookProofUrl==='string' && Boolean(proofBase) && bookProofUrl.startsWith(`${proofBase}/`);
+    if(!participantName?.trim() || !birthDate || !parentName?.trim() || phone.length<10 || !validEmail(email) || consent!==true) return res.status(400).json({message:'Lengkapi data peserta dan persetujuan'});
+    if(bookRequirement==='required' && !validProof) return res.status(400).json({message:'Foto anak bersama buku wajib diunggah'});
+    const amount=Number(competition.price);
+    const quota=Number(competition.metadata?.quota||0);
+    const close=competition.metadata?.registrationClose ? new Date(String(competition.metadata.registrationClose)) : null;
+    if(!Number.isInteger(amount)||amount<1) return res.status(409).json({message:'Harga lomba belum valid'});
+    if(close && close<=new Date()) return res.status(409).json({message:'Pendaftaran sudah ditutup'});
+    if(quota && await db.countCompetitionSlots(competition.id)>=quota) return res.status(409).json({message:'Kuota lomba sudah penuh'});
+    const suffix=crypto.randomBytes(5).toString('hex').toUpperCase();
+    const orderId=`LOMBA-${Date.now()}-${suffix}`;
+    const registrationCode=`NALA-${suffix}`;
+    const registration=await db.createCompetitionRegistration({competitionId:competition.id,competitionTitle:competition.title,orderId,registrationCode,participantName:participantName.trim(),birthDate,schoolName:schoolName?.trim(),parentName:parentName.trim(),whatsapp:phone,email:email.trim().toLowerCase(),bookProofUrl:validProof?bookProofUrl:null,amount,expiresAt:new Date(Date.now()+15*60*1000)});
+    const transaction=await snap.createTransaction({transaction_details:{order_id:orderId,gross_amount:amount},item_details:[{id:`lomba-${competition.id}`,price:amount,quantity:1,name:competition.title.slice(0,50)}],customer_details:{first_name:parentName.trim(),email:email.trim().toLowerCase(),phone},custom_field1:`Peserta: ${participantName.trim()}`,custom_field2:`Kode: ${registrationCode}`,enabled_payments:['qris','other_qris'],expiry:{unit:'minutes',duration:15}});
+    res.status(201).json({registration,paymentUrl:transaction.redirect_url});
+  } catch(error) { console.error('Competition registration error:',error); res.status(500).json({message:'Gagal membuat pendaftaran'}); }
+});
+
+app.get('/api/admin/competition-registrations',requireAdmin,async(req,res)=>res.json({registrations:await db.getCompetitionRegistrations()}));
+app.post('/api/admin/competition-registrations/:id/check-in',requireAdmin,async(req,res)=>{const registration=await db.checkInCompetitionRegistration(req.params.id); if(!registration)return res.status(409).json({message:'Peserta belum lunas atau tidak ditemukan'}); res.json({registration});});
+app.get('/api/admin/competition-registrations.csv',requireAdmin,async(req,res)=>{const rows=await db.getCompetitionRegistrations(); const safe=v=>{const s=String(v??'');return `"${(/^[=+\-@]/.test(s)?"'":'')+s.replace(/"/g,'""')}"`}; const columns=['registrationCode','competitionTitle','participantName','birthDate','schoolName','parentName','whatsapp','email','bookProofUrl','amount','paymentStatus','checkedInAt','createdAt']; res.type('text/csv').attachment('peserta-lomba.csv').send('\ufeff'+[columns.join(','),...rows.map(r=>columns.map(c=>safe(r[c])).join(','))].join('\n'));});
+
 // Midtrans Payment Link Endpoint
 app.post('/api/midtrans/create-payment-link', async (req, res) => {
   try {
@@ -820,10 +866,9 @@ app.post('/api/midtrans/notification', async (req, res) => {
   try {
     const notification = req.body;
 
-    // Verify signature key (optional but recommended)
-    // const signatureKey = notification.signature_key;
-    // const calculatedSignature = sha512(notification.order_id + notification.status_code + notification.gross_amount + process.env.MIDTRANS_SERVER_KEY);
-    // if (signatureKey !== calculatedSignature) return res.status(403).json({ message: 'Invalid signature' });
+    const signatureKey = String(notification.signature_key || '');
+    const calculatedSignature = crypto.createHash('sha512').update(`${notification.order_id || ''}${notification.status_code || ''}${notification.gross_amount || ''}${process.env.MIDTRANS_SERVER_KEY || ''}`).digest('hex');
+    if (!signatureKey || signatureKey.length !== calculatedSignature.length || !crypto.timingSafeEqual(Buffer.from(signatureKey), Buffer.from(calculatedSignature))) return res.status(403).json({ message: 'Invalid signature' });
 
     const transactionStatus = notification.transaction_status;
     const fraudStatus = notification.fraud_status;
@@ -831,6 +876,16 @@ app.post('/api/midtrans/notification', async (req, res) => {
     const transactionId = notification.transaction_id;
 
     console.log(`Received notification for order ${orderId}: ${transactionStatus}`);
+
+    if (orderId?.startsWith('LOMBA-')) {
+      const registration=await db.getCompetitionRegistrationByOrder(orderId);
+      if(!registration) return res.status(404).json({message:'Registration not found'});
+      if(Number(notification.gross_amount)!==registration.amount || !['qris','gopay'].includes(notification.payment_type)) return res.status(400).json({message:'Payment mismatch'});
+      const status=transactionStatus==='settlement'?'paid':['cancel','deny'].includes(transactionStatus)?'cancelled':transactionStatus==='expire'?'expired':'pending';
+      await db.updateCompetitionPayment(orderId,status,transactionId);
+      if(status==='paid') await sendTelegramNotification(orderId,transactionId,notification,registration.registrationCode);
+      return res.status(200).json({status:'OK'});
+    }
 
     if (transactionStatus == 'capture') {
       if (fraudStatus == 'challenge') {

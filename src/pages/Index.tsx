@@ -6,6 +6,7 @@ import ArtClasses from "@/components/ArtClasses";
 import Merchandise from "@/components/Merchandise";
 import FreeWorksheet from "@/components/FreeWorksheet";
 import DigitalProducts from "@/components/DigitalProducts";
+import CompetitionPromo from "@/components/CompetitionPromo";
 import Footer from "@/components/Footer";
 
 const Index = () => {
@@ -13,6 +14,7 @@ const Index = () => {
     <main className="min-h-screen">
       <Seo title={HOME_TITLE} description={HOME_DESCRIPTION} path="/" />
       <Hero />
+      <CompetitionPromo />
       <BestSellerBooks />
       <ArtClasses />
       <Merchandise />

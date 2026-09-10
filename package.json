@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:server": "node server/index.js",
     "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",
-    "build": "vite build && node scripts/prerender-seo.mjs",
+    "build": "vite build && node scripts/prerender-seo.mjs && node scripts/prepare-spa-routes.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",

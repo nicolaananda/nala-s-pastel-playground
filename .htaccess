@@ -21,6 +21,9 @@
     RewriteRule ^((?:buku|berita-lomba)/[a-z0-9]+(?:-[a-z0-9]+)*)/?$ /$1/index.html [L]
     RewriteRule ^(?:buku|berita-lomba)/.+$ - [R=404,L]
 
+    # Lomba is a registered SPA route; unknown slugs are handled by its API-backed page.
+    RewriteRule ^lomba(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?/?$ /index.html [L]
+
     # Registered static SPA routes remain available.
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d

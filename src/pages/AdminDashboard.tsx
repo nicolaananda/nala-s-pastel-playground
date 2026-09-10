@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { AccessRecord, adminApi, ContentItem, ContentType, MediaItem } from "@/lib/cms";
+import { AccessRecord, adminApi, CompetitionRegistration, ContentItem, ContentType, MediaItem } from "@/lib/cms";
 import SimpleContent from "@/components/SimpleContent";
 import BookVideoEditor from "@/components/BookVideoEditor";
 import { normalizeVideoMetadata } from "../../shared/book-videos.js";
@@ -32,6 +32,7 @@ const contentTypes: Array<{ value: ContentType; label: string }> = [
   { value: "grasp_asset", label: "Grasp Premium" },
   { value: "premium_product", label: "Premium Product" },
   { value: "merchandise", label: "Baju" },
+  { value: "competition", label: "Lomba" },
 ];
 
 type ContentFormat = "plain" | "html";
@@ -43,6 +44,7 @@ const typeHelp: Record<ContentType, string> = {
   grasp_asset: "Asset premium untuk halaman Grasp. Isi File URL dengan link PDF/gambar/video.",
   premium_product: "Produk digital premium. Untuk checkout custom masih perlu wiring jika tipe produk baru.",
   merchandise: "Baju/merchandise. Saat ini homepage menampilkan item pertama sebagai produk baju utama.",
+  competition: "Lomba tampil di /lomba. Harga dipakai server untuk QRIS.",
 };
 
 const slugify = (value: string) => value
@@ -59,6 +61,8 @@ const AdminDashboard = () => {
   const [items, setItems] = useState<ContentItem[]>([]);
   const [transactions, setTransactions] = useState<AccessRecord[]>([]);
   const [logs, setLogs] = useState<Array<Record<string, unknown>>>([]);
+  const [registrations,setRegistrations]=useState<CompetitionRegistration[]>([]);
+  const [registrationSearch,setRegistrationSearch]=useState("");
   const [selectedType, setSelectedType] = useState<ContentType>("book");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | ContentItem["status"]>("all");
@@ -87,18 +91,20 @@ const AdminDashboard = () => {
   const draftCount = useMemo(() => items.filter((item) => item.status === "draft").length, [items]);
 
   const loadAll = async () => {
-    const [me, content, transactionData, auditData, mediaData] = await Promise.all([
+    const [me, content, transactionData, auditData, mediaData, registrationData] = await Promise.all([
       adminApi.me(),
       adminApi.listContent(),
       adminApi.transactions(),
       adminApi.auditLogs(),
       adminApi.media(),
+      adminApi.competitionRegistrations(),
     ]);
     setAdminEmail(me.admin.email);
     setItems(content.items);
     setTransactions(transactionData.transactions);
     setLogs(auditData.logs);
     setMedia(mediaData.media);
+    setRegistrations(registrationData.registrations);
   };
 
   useEffect(() => {
@@ -291,6 +297,7 @@ const AdminDashboard = () => {
             <TabsTrigger value="access">Premium Access</TabsTrigger>
             <TabsTrigger value="uploads">Uploads</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
+            <TabsTrigger value="competitions">Peserta Lomba</TabsTrigger>
           </TabsList>
 
           <TabsContent value="content" className="mt-6 grid gap-6 xl:grid-cols-[minmax(460px,560px)_1fr]">
@@ -421,6 +428,17 @@ const AdminDashboard = () => {
                     <div className="grid grid-cols-2 gap-3 rounded-2xl border p-3"><div className="space-y-2"><Label>Harga anak</Label><Input type="number" value={String(metadataValue("priceAnak") || "")} onChange={(event) => updateMetadata("priceAnak", Number(event.target.value || 0))} /></div><div className="space-y-2"><Label>Harga dewasa</Label><Input type="number" value={String(metadataValue("priceDewasa") || "")} onChange={(event) => updateMetadata("priceDewasa", Number(event.target.value || 0))} /></div></div>
                   ) : null}
 
+                  {formItem.type === "competition" ? (
+                    <div className="grid grid-cols-2 gap-3 rounded-2xl border p-3">
+                      <div className="space-y-2"><Label>Tanggal acara</Label><Input type="datetime-local" value={String(metadataValue("eventDate") || "")} onChange={(event) => updateMetadata("eventDate", event.target.value)} /></div>
+                      <div className="space-y-2"><Label>Tutup pendaftaran</Label><Input type="datetime-local" value={String(metadataValue("registrationClose") || "")} onChange={(event) => updateMetadata("registrationClose", event.target.value)} /></div>
+                      <div className="space-y-2"><Label>Lokasi</Label><Input value={String(metadataValue("location") || "")} onChange={(event) => updateMetadata("location", event.target.value)} /></div>
+                      <div className="space-y-2"><Label>Kuota</Label><Input type="number" min="1" value={String(metadataValue("quota") || "")} onChange={(event) => updateMetadata("quota", Number(event.target.value || 0))} /></div>
+                      <div className="space-y-2"><Label>Kepemilikan buku</Label><Select value={String(metadataValue("bookRequirement") || "none")} onValueChange={(value) => updateMetadata("bookRequirement", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Tidak ditanyakan</SelectItem><SelectItem value="optional">Opsional</SelectItem><SelectItem value="required">Wajib</SelectItem></SelectContent></Select></div>
+                      <div className="space-y-2"><Label>Link beli buku</Label><Input type="url" value={String(metadataValue("bookPurchaseUrl") || "")} onChange={(event) => updateMetadata("bookPurchaseUrl", event.target.value)} placeholder="https://artstudionala.com/buku/..." /></div>
+                    </div>
+                  ) : null}
+
                   {formItem.type === "grasp_asset" ? (
                     <div className="grid grid-cols-2 gap-3 rounded-2xl border p-3"><div className="space-y-2"><Label>Group akses</Label><Input value={String(metadataValue("accessGroup") || "grasp-60-color")} onChange={(event) => updateMetadata("accessGroup", event.target.value)} /></div><div className="space-y-2"><Label>Tipe asset</Label><Select value={String(metadataValue("assetType") || "image")} onValueChange={(value) => updateMetadata("assetType", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="image">Image</SelectItem><SelectItem value="pdf">PDF</SelectItem><SelectItem value="video">Video</SelectItem></SelectContent></Select></div></div>
                   ) : null}
@@ -491,6 +509,7 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="audit"><Card><CardHeader><CardTitle>Audit Log</CardTitle></CardHeader><CardContent className="space-y-2">{logs.map((log) => <pre key={String(log.id)} className="overflow-auto rounded-xl bg-muted p-3 text-xs">{JSON.stringify(log, null, 2)}</pre>)}</CardContent></Card></TabsContent>
+          <TabsContent value="competitions"><Card><CardHeader><CardTitle>Peserta Lomba</CardTitle></CardHeader><CardContent className="space-y-4"><div className="flex gap-2"><Input placeholder="Cari peserta, kode, WA, lomba…" value={registrationSearch} onChange={e=>setRegistrationSearch(e.target.value)}/><Button asChild><a href={`${import.meta.env.VITE_API_URL||''}/api/admin/competition-registrations.csv`}>Export CSV</a></Button></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left"><th>Kode</th><th>Peserta</th><th>Lomba</th><th>WA</th><th>Bayar</th><th>Hadir</th></tr></thead><tbody>{registrations.filter(r=>JSON.stringify(r).toLowerCase().includes(registrationSearch.toLowerCase())).map(r=><tr key={r.id} className="border-t"><td>{r.registrationCode}</td><td>{r.participantName}<br/><small>{r.parentName}</small></td><td>{r.competitionTitle}</td><td>{r.whatsapp}</td><td>{r.paymentStatus}{r.bookProofUrl?<><br/><a className="underline" href={r.bookProofUrl} target="_blank" rel="noreferrer">Lihat foto buku</a></>:null}</td><td>{r.checkedInAt?'Sudah':<Button size="sm" disabled={r.paymentStatus!=='paid'} onClick={()=>adminApi.checkInCompetition(r.id).then(loadAll)}>Check-in</Button>}</td></tr>)}</tbody></table></div></CardContent></Card></TabsContent>
         </Tabs>
       </div>
     </main>

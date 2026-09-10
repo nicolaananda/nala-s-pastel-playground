@@ -9,6 +9,7 @@ let memoryContentId = 1;
 let memoryAuditId = 1;
 const memoryAccessCodes = [];
 const memoryAuditLogs = [];
+const memoryCompetitionRegistrations = [];
 
 const defaultContentItems = [
   {
@@ -255,6 +256,32 @@ export const initDatabase = async () => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS competition_registrations (
+        id SERIAL PRIMARY KEY,
+        competition_id INTEGER NOT NULL REFERENCES content_items(id),
+        order_id VARCHAR(255) UNIQUE NOT NULL,
+        registration_code VARCHAR(50) UNIQUE NOT NULL,
+        participant_name VARCHAR(255) NOT NULL,
+        birth_date DATE NOT NULL,
+        school_name VARCHAR(255),
+        parent_name VARCHAR(255) NOT NULL,
+        whatsapp VARCHAR(30) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        book_proof_url TEXT,
+        amount INTEGER NOT NULL,
+        payment_status VARCHAR(30) NOT NULL DEFAULT 'pending',
+        transaction_id VARCHAR(255),
+        checked_in_at TIMESTAMP,
+        paid_at TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_competition_registrations_competition ON competition_registrations(competition_id, payment_status);
+    `);
+    await pool.query(`ALTER TABLE competition_registrations ADD COLUMN IF NOT EXISTS book_proof_url TEXT`);
 
     for (const item of defaultContentItems) {
       await pool.query(
@@ -636,6 +663,50 @@ export const db = {
       details: row.details || {},
       createdAt: row.created_at?.toISOString?.() || row.created_at,
     }));
+  },
+
+  async countCompetitionSlots(competitionId) {
+    if (useMemoryDb) return memoryCompetitionRegistrations.filter((row) => String(row.competition_id) === String(competitionId) && (row.payment_status === 'paid' || (row.payment_status === 'pending' && new Date(row.expires_at) > new Date()))).length;
+    const result = await pool.query(`SELECT COUNT(*)::int AS count FROM competition_registrations WHERE competition_id=$1 AND (payment_status='paid' OR (payment_status='pending' AND expires_at > CURRENT_TIMESTAMP))`, [competitionId]);
+    return result.rows[0].count;
+  },
+
+  async createCompetitionRegistration(data) {
+    if (useMemoryDb) {
+      const row = { id: memoryCompetitionRegistrations.length + 1, competition_id: data.competitionId, order_id: data.orderId, registration_code: data.registrationCode, participant_name: data.participantName, birth_date: data.birthDate, school_name: data.schoolName, parent_name: data.parentName, whatsapp: data.whatsapp, email: data.email, book_proof_url: data.bookProofUrl, amount: data.amount, payment_status: 'pending', expires_at: data.expiresAt, competition_title: data.competitionTitle, created_at: new Date() };
+      memoryCompetitionRegistrations.unshift(row);
+      return this.competitionRegistrationToJson(row);
+    }
+    const result = await pool.query(`INSERT INTO competition_registrations (competition_id,order_id,registration_code,participant_name,birth_date,school_name,parent_name,whatsapp,email,book_proof_url,amount,expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`, [data.competitionId,data.orderId,data.registrationCode,data.participantName,data.birthDate,data.schoolName||null,data.parentName,data.whatsapp,data.email,data.bookProofUrl||null,data.amount,data.expiresAt]);
+    return this.competitionRegistrationToJson(result.rows[0]);
+  },
+
+  async getCompetitionRegistrationByOrder(orderId) {
+    if (useMemoryDb) { const row=memoryCompetitionRegistrations.find((item)=>item.order_id===orderId); return row ? this.competitionRegistrationToJson(row) : null; }
+    const result=await pool.query(`SELECT r.*,c.title AS competition_title,c.slug AS competition_slug FROM competition_registrations r JOIN content_items c ON c.id=r.competition_id WHERE r.order_id=$1 LIMIT 1`,[orderId]);
+    return result.rows[0] ? this.competitionRegistrationToJson(result.rows[0]) : null;
+  },
+
+  async updateCompetitionPayment(orderId, status, transactionId) {
+    if (useMemoryDb) { const row=memoryCompetitionRegistrations.find((item)=>item.order_id===orderId); if(!row)return null; if(row.payment_status!=='paid')row.payment_status=status; row.transaction_id=transactionId||row.transaction_id; if(status==='paid')row.paid_at=row.paid_at||new Date(); return this.competitionRegistrationToJson(row); }
+    const result=await pool.query(`UPDATE competition_registrations SET payment_status=CASE WHEN payment_status='paid' THEN 'paid' ELSE $2 END, transaction_id=COALESCE($3,transaction_id), paid_at=CASE WHEN $2='paid' THEN COALESCE(paid_at,CURRENT_TIMESTAMP) ELSE paid_at END, updated_at=CURRENT_TIMESTAMP WHERE order_id=$1 RETURNING *`,[orderId,status,transactionId||null]);
+    return result.rows[0] ? this.competitionRegistrationToJson(result.rows[0]) : null;
+  },
+
+  async getCompetitionRegistrations() {
+    if (useMemoryDb) return memoryCompetitionRegistrations.map((row)=>this.competitionRegistrationToJson(row));
+    const result=await pool.query(`SELECT r.*,c.title AS competition_title,c.slug AS competition_slug FROM competition_registrations r JOIN content_items c ON c.id=r.competition_id ORDER BY r.created_at DESC`);
+    return result.rows.map((row)=>this.competitionRegistrationToJson(row));
+  },
+
+  async checkInCompetitionRegistration(id) {
+    if (useMemoryDb) { const row=memoryCompetitionRegistrations.find((item)=>String(item.id)===String(id)); if(!row||row.payment_status!=='paid')return null; row.checked_in_at=row.checked_in_at||new Date(); return this.competitionRegistrationToJson(row); }
+    const result=await pool.query(`UPDATE competition_registrations SET checked_in_at=COALESCE(checked_in_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP WHERE id=$1 AND payment_status='paid' RETURNING *`,[id]);
+    return result.rows[0] ? this.competitionRegistrationToJson(result.rows[0]) : null;
+  },
+
+  competitionRegistrationToJson(row) {
+    return { id:row.id, competitionId:row.competition_id, competitionTitle:row.competition_title||'', competitionSlug:row.competition_slug||'', orderId:row.order_id, registrationCode:row.registration_code, participantName:row.participant_name, birthDate:row.birth_date, schoolName:row.school_name||'', parentName:row.parent_name, whatsapp:row.whatsapp, email:row.email, bookProofUrl:row.book_proof_url||null, amount:row.amount, paymentStatus:row.payment_status, transactionId:row.transaction_id||null, checkedInAt:row.checked_in_at?.toISOString?.()||row.checked_in_at||null, paidAt:row.paid_at?.toISOString?.()||row.paid_at||null, expiresAt:row.expires_at?.toISOString?.()||row.expires_at, createdAt:row.created_at?.toISOString?.()||row.created_at };
   },
 
   contentRowToJson(row) {
