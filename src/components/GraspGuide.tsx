@@ -178,7 +178,7 @@ const GraspGuide = ({
             // Poll for code
             const pollForCode = async () => {
               let attempts = 0;
-              const maxAttempts = 10; // 20 seconds total
+              const maxAttempts = 60; // Webhook pusat dapat membutuhkan waktu hingga 2 menit.
               const baseUrl = import.meta.env.VITE_API_URL || '';
 
               const check = async () => {
@@ -239,16 +239,13 @@ const GraspGuide = ({
                 return false;
               };
 
-              const interval = setInterval(async () => {
+              const runCheck = async () => {
                 attempts++;
                 const success = await check();
-                if (success || attempts >= maxAttempts) {
-                  clearInterval(interval);
-                  if (!success) {
-                    toast.error("Gagal mengambil kode otomatis. Silakan cek email atau hubungi admin.");
-                  }
-                }
-              }, 2000);
+                if (!success && attempts < maxAttempts) return setTimeout(runCheck, 2000);
+                if (!success) toast("Kode belum tersedia. Jangan bayar ulang; masukkan kode dari admin atau coba beberapa saat lagi.");
+              };
+              void runCheck();
             };
 
             pollForCode();
