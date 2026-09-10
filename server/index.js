@@ -543,6 +543,7 @@ app.get('/api/midtrans/debug', (req, res) => {
 
 const normalizeWhatsapp = (value='') => String(value).replace(/\D/g,'').replace(/^0/,'62');
 const validEmail = (value='') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const normalizeIsbn = (value='') => String(value).toUpperCase().replace(/[^0-9X]/g,'');
 
 app.post('/api/competitions/:slug/book-proof', async (req,res) => {
   try {
@@ -561,7 +562,7 @@ app.post('/api/competitions/:slug/register', async (req,res) => {
   try {
     const competition=await db.getPublicContentBySlug('competition',req.params.slug);
     if(!competition) return res.status(404).json({message:'Lomba tidak ditemukan'});
-    const {participantName,birthDate,schoolName,parentName,whatsapp,email,consent,bookProofUrl}=req.body||{};
+    const {participantName,birthDate,schoolName,parentName,whatsapp,email,consent,bookProofUrl,isbn}=req.body||{};
     const phone=normalizeWhatsapp(whatsapp);
     const bookRequirement=String(competition.metadata?.bookRequirement||'none');
     const proofBase=(r2Config()?.publicUrl||process.env.PUBLIC_API_URL||'').replace(/\/$/,'');
@@ -569,9 +570,11 @@ app.post('/api/competitions/:slug/register', async (req,res) => {
     if(!participantName?.trim() || !birthDate || !parentName?.trim() || phone.length<10 || !validEmail(email) || consent!==true) return res.status(400).json({message:'Lengkapi data peserta dan persetujuan'});
     if(bookRequirement==='required' && !validProof) return res.status(400).json({message:'Foto anak bersama buku wajib diunggah'});
     const amount=Number(competition.price);
+    const acceptedIsbn=String(competition.metadata?.isbn||'').split(/[\n,]+/).map(normalizeIsbn).filter(Boolean);
     const quota=Number(competition.metadata?.quota||0);
     const close=competition.metadata?.registrationClose ? new Date(String(competition.metadata.registrationClose)) : null;
-    if(!Number.isInteger(amount)||amount<1) return res.status(409).json({message:'Harga lomba belum valid'});
+    if(!Number.isInteger(amount)||amount<0) return res.status(409).json({message:'Harga lomba belum valid'});
+    if(amount===0 && (!acceptedIsbn.length || !acceptedIsbn.includes(normalizeIsbn(isbn)))) return res.status(400).json({message:'ISBN buku tidak valid'});
     if(close && close<=new Date()) return res.status(409).json({message:'Pendaftaran sudah ditutup'});
     if(quota && await db.countCompetitionSlots(competition.id)>=quota) return res.status(409).json({message:'Kuota lomba sudah penuh'});
     const suffix=crypto.randomBytes(5).toString('hex').toUpperCase();
@@ -579,6 +582,7 @@ app.post('/api/competitions/:slug/register', async (req,res) => {
     const registrationCode=`NALA-${suffix}`;
     const accessToken=crypto.randomBytes(24).toString('hex');
     const registration=await db.createCompetitionRegistration({competitionId:competition.id,competitionTitle:competition.title,orderId,registrationCode,accessToken,participantName:participantName.trim(),birthDate,schoolName:schoolName?.trim(),parentName:parentName.trim(),whatsapp:phone,email:email.trim().toLowerCase(),bookProofUrl:validProof?bookProofUrl:null,amount,expiresAt:new Date(Date.now()+15*60*1000)});
+    if(amount===0){await db.updateCompetitionPayment(orderId,'paid','FREE-ISBN');return res.status(201).json({accessToken,free:true});}
     const transaction=await snap.createTransaction({transaction_details:{order_id:orderId,gross_amount:amount},item_details:[{id:`lomba-${competition.id}`,price:amount,quantity:1,name:competition.title.slice(0,50)}],customer_details:{first_name:parentName.trim(),email:email.trim().toLowerCase(),phone},custom_field1:`Peserta: ${participantName.trim()}`,custom_field2:`Kode: ${registrationCode}`,enabled_payments:['qris','other_qris'],callbacks:{finish:`https://artstudionala.com/lomba/${competition.slug}?order=${encodeURIComponent(orderId)}`},expiry:{unit:'minutes',duration:15}});
     res.status(201).json({accessToken,token:transaction.token,paymentUrl:transaction.redirect_url});
   } catch(error) { console.error('Competition registration error:',error); res.status(500).json({message:'Gagal membuat pendaftaran'}); }
@@ -1002,6 +1006,14 @@ const buildProductSection = (orderId, notification) => {
     };
   }
 
+  if (orderId.startsWith('LOMBA-')) {
+    const lines = ['<b>🎨 Detail Lomba</b>'];
+    parsePipeFields(cf1).forEach(({ label, value }) => {
+      if (label) lines.push(`• <b>${escapeHtml(label)}:</b> ${escapeHtml(value)}`);
+    });
+    return { title: '🎨 Pendaftaran Lomba', body: lines.join('\n') };
+  }
+
   return { title: '📖 Grasp Guide', body: '' };
 };
 
@@ -1051,7 +1063,7 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
         '<b>💳 Pembayaran</b>',
         `• <b>Order ID:</b> <code>${escapeHtml(orderId)}</code>`,
         `• <b>Nominal:</b> Rp ${escapeHtml(amount)}`,
-        `• <b>Kode Akses:</b> <code>${escapeHtml(code)}</code>`,
+        `• <b>${orderId.startsWith('LOMBA-') ? 'Nomor Peserta' : 'Kode Akses'}:</b> <code>${escapeHtml(code)}</code>`,
         `• <b>Metode:</b> ${escapeHtml(paymentType)}`,
         `• <b>Status:</b> ✅ LUNAS`,
       ].join('\n')

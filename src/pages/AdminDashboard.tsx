@@ -435,6 +435,7 @@ const AdminDashboard = () => {
                       <div className="space-y-2"><Label>Kuota</Label><Input type="number" min="1" value={String(metadataValue("quota") || "")} onChange={(event) => updateMetadata("quota", Number(event.target.value || 0))} /></div>
                       <div className="space-y-2"><Label>Kepemilikan buku</Label><Select value={String(metadataValue("bookRequirement") || "none")} onValueChange={(value) => updateMetadata("bookRequirement", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Tidak ditanyakan</SelectItem><SelectItem value="optional">Opsional</SelectItem><SelectItem value="required">Wajib</SelectItem></SelectContent></Select></div>
                       <div className="space-y-2"><Label>Link beli buku</Label><Input type="url" value={String(metadataValue("bookPurchaseUrl") || "")} onChange={(event) => updateMetadata("bookPurchaseUrl", event.target.value)} placeholder="https://artstudionala.com/buku/..." /></div>
+                      <div className="space-y-2"><Label>ISBN untuk daftar gratis</Label><Input value={String(metadataValue("isbn") || "")} onChange={(event) => updateMetadata("isbn", event.target.value)} placeholder="Pisahkan dengan koma untuk beberapa ISBN" /></div>
                     </div>
                   ) : null}
 
