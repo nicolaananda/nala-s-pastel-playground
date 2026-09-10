@@ -201,12 +201,12 @@ const parseMultipartUpload = async (req) => {
   };
 };
 
-const optimizeUpload = async (upload) => {
-  if (!upload.contentType.startsWith('image/') || upload.ext === '.gif') return upload;
+const optimizeUpload = async (upload, quality = 82) => {
+  if (!upload.contentType.startsWith('image/')) return upload;
   const optimized = await sharp(upload.buffer)
     .rotate()
     .resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 82, effort: 5 })
+    .webp({ quality, effort: 5 })
     .toBuffer();
 
   return {
@@ -548,7 +548,7 @@ app.post('/api/competitions/:slug/book-proof', async (req,res) => {
   try {
     const competition=await db.getPublicContentBySlug('competition',req.params.slug);
     if(!competition || competition.metadata?.bookRequirement==='none') return res.status(404).json({message:'Upload bukti tidak tersedia'});
-    const upload=await optimizeUpload(await parseMultipartUpload(req));
+    const upload=await optimizeUpload(await parseMultipartUpload(req),60);
     if(!upload.contentType.startsWith('image/')) return res.status(400).json({message:'Bukti harus berupa foto JPG, PNG, WebP, atau GIF'});
     const filename=`competition-proofs/${Date.now()}-${crypto.randomBytes(8).toString('hex')}${upload.ext}`;
     let url=await uploadToR2({key:filename,buffer:upload.buffer,contentType:upload.contentType});
