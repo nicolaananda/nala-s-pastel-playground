@@ -576,7 +576,7 @@ app.post('/api/competitions/:slug/register', async (req,res) => {
     const quota=Number(competition.metadata?.quota||0);
     const close=competition.metadata?.registrationClose ? new Date(String(competition.metadata.registrationClose)) : null;
     if(!Number.isInteger(amount)||amount<0) return res.status(409).json({message:'Harga lomba belum valid'});
-    if(amount===0 && (!acceptedIsbn.length || !acceptedIsbn.includes(normalizeIsbn(isbn)))) return res.status(400).json({message:'ISBN buku tidak valid'});
+    if(amount===0 && acceptedIsbn.length && !acceptedIsbn.includes(normalizeIsbn(isbn))) return res.status(400).json({message:'ISBN buku tidak valid'});
     if(close && close<=new Date()) return res.status(409).json({message:'Pendaftaran sudah ditutup'});
     if(quota && await db.countCompetitionSlots(competition.id)>=quota) return res.status(409).json({message:'Kuota lomba sudah penuh'});
     const suffix=crypto.randomBytes(5).toString('hex').toUpperCase();
