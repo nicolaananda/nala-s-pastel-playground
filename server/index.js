@@ -894,7 +894,8 @@ app.post('/api/midtrans/notification', async (req, res) => {
       const registration=await db.getCompetitionRegistrationByOrder(orderId);
       if(!registration) return res.status(404).json({message:'Registration not found'});
       if(Number(notification.gross_amount)!==registration.amount || !['qris','gopay'].includes(notification.payment_type)) return res.status(400).json({message:'Payment mismatch'});
-      const status=transactionStatus==='settlement'?'paid':['cancel','deny'].includes(transactionStatus)?'cancelled':transactionStatus==='expire'?'expired':'pending';
+      const paid=transactionStatus==='settlement'||(transactionStatus==='capture'&&fraudStatus==='accept');
+      const status=paid?'paid':['cancel','deny'].includes(transactionStatus)?'cancelled':transactionStatus==='expire'?'expired':'pending';
       await db.updateCompetitionPayment(orderId,status,transactionId);
       if(status==='paid') await sendTelegramNotification(orderId,transactionId,notification,registration.registrationCode);
       return res.status(200).json({status:'OK'});
