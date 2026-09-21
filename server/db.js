@@ -221,6 +221,14 @@ export const initDatabase = async () => {
     `);
 
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_order_details (
+        order_id VARCHAR(255) PRIMARY KEY,
+        customer_details JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS content_items (
         id SERIAL PRIMARY KEY,
         type VARCHAR(50) NOT NULL,
@@ -317,6 +325,25 @@ export const initDatabase = async () => {
 
 // Database operations
 export const db = {
+  async savePaymentOrderDetails(orderId, customerDetails) {
+    if (useMemoryDb) return;
+    await pool.query(
+      `INSERT INTO payment_order_details (order_id, customer_details)
+       VALUES ($1, $2)
+       ON CONFLICT (order_id) DO UPDATE SET customer_details = EXCLUDED.customer_details`,
+      [orderId, JSON.stringify(customerDetails || {})]
+    );
+  },
+
+  async getPaymentOrderDetails(orderId) {
+    if (useMemoryDb) return null;
+    const result = await pool.query(
+      'SELECT customer_details FROM payment_order_details WHERE order_id = $1',
+      [orderId]
+    );
+    return result.rows[0]?.customer_details || null;
+  },
+
   // Save access code
   async saveAccessCode({ transactionId, orderId, code, customer, source = 'webhook' }) {
     if (useMemoryDb) {

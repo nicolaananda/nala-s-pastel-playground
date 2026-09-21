@@ -635,6 +635,12 @@ app.post('/api/midtrans/create-payment-link', async (req, res) => {
       customer: parameter.customer_details?.email
     });
 
+    // Midtrans webhook may omit customer address, so retain checkout details server-side.
+    await db.savePaymentOrderDetails(
+      parameter.transaction_details.order_id,
+      parameter.customer_details
+    );
+
     // Create transaction
     const transaction = await snap.createTransaction(parameter);
 
@@ -1044,11 +1050,17 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
 
   try {
     const amount = parseFloat(notification.gross_amount).toLocaleString('id-ID');
-    const firstName = notification.customer_details?.first_name || '';
-    const lastName = notification.customer_details?.last_name || '';
+    const savedCustomer = await db.getPaymentOrderDetails(orderId);
+    const customer = {
+      ...(savedCustomer || {}),
+      ...(notification.customer_details || {}),
+    };
+    const shipping = customer.shipping_address || customer.billing_address || {};
+    const firstName = customer.first_name || shipping.first_name || '';
+    const lastName = customer.last_name || shipping.last_name || '';
     const customerName = `${firstName} ${lastName}`.trim() || '-';
-    const customerEmail = notification.customer_details?.email || '-';
-    const customerPhone = notification.customer_details?.phone || '-';
+    const customerEmail = customer.email || '-';
+    const customerPhone = customer.phone || shipping.phone || '-';
     const paymentType = notification.payment_type || '-';
     const timestamp = new Date().toLocaleString('id-ID', {
       timeZone: 'Asia/Jakarta',
@@ -1088,6 +1100,20 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
         `• <b>No HP:</b> ${escapeHtml(customerPhone)}`,
       ].join('\n')
     );
+
+    if (orderId.startsWith('BOOK-')) {
+      const addressLines = [
+        shipping.address,
+        shipping.city,
+        shipping.postal_code,
+      ].filter(Boolean);
+      sections.push(
+        [
+          '<b>📍 Alamat Pengiriman</b>',
+          `• ${escapeHtml(addressLines.join(', ') || '-')}`,
+        ].join('\n')
+      );
+    }
 
     sections.push(`🕒 <i>${escapeHtml(timestamp)} WIB</i>`);
 
