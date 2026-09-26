@@ -55,6 +55,8 @@ SMTP_PASS=your-smtp-password
 SMTP_FROM=Nala Art Studio <noreply@example.com>
 ```
 
+`SMTP_PASS` is canonical. `SMTP_PASSWORD` remains a supported compatibility alias.
+
 ## Menjalankan Project
 
 Frontend saja:

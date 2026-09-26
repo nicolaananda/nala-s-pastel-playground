@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
+import {hashPassword,verifyPassword,validPassword,parseCookies} from './member-auth.js';
+import {memberNotification,validYoutubeId} from './member-routes.js';
+const hash=await hashPassword('kata-sandi-aman');
+assert.equal(await verifyPassword('kata-sandi-aman',hash),true);assert.equal(await verifyPassword('salah',hash),false);assert.equal(await verifyPassword('x',`scrypt$999999$8$1$${'a'.repeat(30)}$${'a'.repeat(90)}`),false);assert.equal(validPassword('pendek'),false);assert.deepEqual(parseCookies('bad=%E0%A4%A; ok=yes'),{ok:'yes'});assert.equal(validYoutubeId('dQw4w9WgXcQ'),true);
+let settled=0,state='';const store={setOrderState:async(id,x)=>state=x,transaction:async fn=>fn({query:async(sql)=>{if(sql.includes('FROM member_orders'))return {rows:[{id:1,member_id:9,amount:30000,duration_days:30,fulfilled_at:null}]};if(sql.includes('RETURNING membership'))return {rows:[{membership_expires_at:new Date()}]};if(sql.includes('UPDATE member_orders'))settled++;return {rows:[]}}})};
+const key='isolated-member-test-key',notification={order_id:'MEMBER-TEST-1',status_code:'200',gross_amount:'30000',transaction_status:'settlement',payment_type:'qris',transaction_id:'tampered'};notification.signature_key=crypto.createHash('sha512').update(`${notification.order_id}${notification.status_code}${notification.gross_amount}${key}`).digest('hex');
+let result=await memberNotification({store,serverKey:key,notification,resolveProviderStatus:async()=>({...notification,transaction_status:'pending',transaction_id:'provider'})});assert.equal(result.status,200);assert.equal(state,'pending');assert.equal(settled,0);
+const settlement={...notification,transaction_id:'provider',settlement_time:'2026-03-01 12:00:00 +0700'};result=await memberNotification({store,serverKey:key,notification,resolveProviderStatus:async()=>settlement});assert.equal(result.status,200);assert.equal(settled,1);
+assert.equal((await memberNotification({store,serverKey:'',notification,resolveProviderStatus:async()=>settlement})).status,503);assert.equal((await memberNotification({store,serverKey:key,notification:{...notification,signature_key:'bad'},resolveProviderStatus:async()=>settlement})).status,403);
+const legacy={...notification,order_id:'LOMBA-LEGACY'};legacy.signature_key=crypto.createHash('sha512').update(`${legacy.order_id}${legacy.status_code}${legacy.gross_amount}${key}`).digest('hex');assert.equal(await memberNotification({store,serverKey:key,notification:legacy,resolveProviderStatus:async()=>settlement}),null);
+console.log('member core isolated checks: ok');

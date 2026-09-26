@@ -3,7 +3,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import midtransClient from 'midtrans-client';
 import axios from 'axios';
-import { db, initDatabase } from './db.js';
+import { db, initDatabase, pool } from './db.js';
+import { createMemberStore } from './member-db.js';
+import { parseCookies as parseCookieHeader, verifySignedJson } from './member-auth.js';
+import { createMemberRouter, memberNotification } from './member-routes.js';
+import { createMemberAdminRouter } from './member-admin.js';
+import { createPhase7AdminRouter } from './member-phase7-admin.js';
+import { createPhase7PublicRouter } from './member-phase7.js';
 import TelegramBot from 'node-telegram-bot-api';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
@@ -23,12 +29,14 @@ const PORT = process.env.PORT || 3001;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadDir = path.resolve(__dirname, '..', 'public', 'uploads');
+const memberPrivateDir = path.resolve(process.env.MEMBER_PRIVATE_DIR || path.join(__dirname, 'private-member-files'));
 
 // Middleware
 // CORS configuration - allow requests from production domain
 const allowedOrigins = [
   'https://artstudionala.com',
   'https://www.artstudionala.com',
+  'https://member.artstudionala.com',
   'http://localhost:8080',
   'http://localhost:5173',
 ];
@@ -38,17 +46,28 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       console.warn(`CORS blocked origin: ${origin}`);
-      callback(null, true); // Allow all in development, restrict in production if needed
+      callback(new Error('CORS origin not allowed'));
     }
   },
   credentials: true,
 }));
-app.use(express.json({ limit: '2mb' }));
+app.use((req,res,next)=>req.method==='POST'&&['/api/admin/member/worksheets','/api/member/program/artworks'].includes(req.path)?next():express.json({limit:'2mb'})(req,res,next));
 app.use('/uploads', express.static(uploadDir));
+
+const memberStore = createMemberStore(pool);
+export const memberMailer = async ({to,purpose,token,reminderKey,expiresAt}) => {
+  const base=(process.env.MEMBER_PORTAL_URL || 'https://member.artstudionala.com').replace(/\/$/,'');
+  const pass=process.env.SMTP_PASS||process.env.SMTP_PASSWORD;
+  const transporter=nodemailer.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:process.env.SMTP_SECURE==='true',auth:process.env.SMTP_USER?{user:process.env.SMTP_USER,pass}:undefined});
+  const renewal=purpose==='renewal',route=purpose==='verify'?'verifikasi':'reset-password';
+  await transporter.sendMail({from:process.env.SMTP_FROM,to,subject:renewal?'Pengingat masa aktif member Nala':purpose==='verify'?'Verifikasi akun Nala':'Reset password Nala',text:renewal?`Masa aktif member Nala ${reminderKey==='expired'?'telah berakhir':'akan berakhir'} pada ${new Date(expiresAt).toISOString()}. Perpanjang melalui ${base}/portal.`:`Buka ${base}/${route}?token=${encodeURIComponent(token)}. Tautan ini hanya dapat digunakan sekali.`});
+};
+app.use('/api/member',createMemberRouter({store:memberStore,sendMail:memberMailer,checkoutEnabled:process.env.MEMBER_CHECKOUT_ENABLED==='true',production:process.env.NODE_ENV==='production',privateDir:memberPrivateDir,allowedOrigins,createPayment:async({orderId,amount,email,name})=>{const transaction=await snap.createTransaction({transaction_details:{order_id:orderId,gross_amount:amount},customer_details:{email,first_name:name},enabled_payments:['qris']});return {redirectUrl:transaction.redirect_url};}}));
+app.use('/api/member-public',createPhase7PublicRouter({pool,artworkDir:path.join(memberPrivateDir,'artworks')}));
 
 const normalizeCode = (code = '') =>
   code.trim().toUpperCase();
@@ -62,16 +81,7 @@ const adminSecret = process.env.JWT_SECRET || process.env.ADMIN_SESSION_SECRET |
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
-const parseCookies = (cookieHeader = '') => Object.fromEntries(
-  cookieHeader
-    .split(';')
-    .map((cookie) => cookie.trim())
-    .filter(Boolean)
-    .map((cookie) => {
-      const [name, ...rest] = cookie.split('=');
-      return [name, decodeURIComponent(rest.join('='))];
-    })
-);
+const parseCookies = parseCookieHeader;
 
 const signSession = (payload) => {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -80,12 +90,8 @@ const signSession = (payload) => {
 };
 
 const verifySession = (token) => {
-  if (!token || !token.includes('.')) return null;
-  const [body, signature] = token.split('.');
-  const expected = crypto.createHmac('sha256', adminSecret).update(body).digest('base64url');
-  if (signature.length !== expected.length) return null;
-  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
-  const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+  const payload = verifySignedJson(token, adminSecret);
+  if (!payload) return null;
   if (!payload.email || !payload.expiresAt || Date.now() > payload.expiresAt) return null;
   return payload;
 };
@@ -115,6 +121,21 @@ const requireAdmin = (req, res, next) => {
   req.admin = { email: session.email };
   next();
 };
+
+const adminBoundary=(req,res,next)=>{res.set('Cache-Control','private, no-store');if(!['GET','HEAD','OPTIONS'].includes(req.method)&&(!req.headers.origin||!allowedOrigins.includes(req.headers.origin)))return res.status(403).json({message:'Origin tidak diizinkan'});next()};
+app.use('/api/admin',adminBoundary);
+app.use('/api/admin/member', requireAdmin, express.json({limit:'14mb'}), createMemberAdminRouter({
+  pool,
+  privateDir: memberPrivateDir,
+  allowedOrigins,
+  reconcileOrder: async orderId => {
+    const verified=await snap.transaction.status(orderId),statusCode=String(verified.status_code||''),amount=String(verified.gross_amount||'');
+    const signature=crypto.createHash('sha512').update(`${orderId}${statusCode}${amount}${process.env.MIDTRANS_SERVER_KEY||''}`).digest('hex');
+    return memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification:{order_id:orderId,status_code:statusCode,gross_amount:amount,signature_key:signature},resolveProviderStatus:async()=>verified});
+  },
+  audit: (req, action, entityType, entityId, details = {}) => db.logAdminAction({ adminEmail: req.admin.email, action: `member_${action}`, entityType: `member_${entityType}`, entityId, details }),
+}));
+app.use('/api/admin/member-program',requireAdmin,express.json({limit:'14mb'}),createPhase7AdminRouter({pool,artworkDir:path.join(memberPrivateDir,'artworks'),audit:(req,action,entityType,entityId,details={})=>db.logAdminAction({adminEmail:req.admin.email,action:`member_${action}`,entityType:`member_${entityType}`,entityId,details})}));
 
 const parseMetadata = (metadata) => {
   if (!metadata) return {};
@@ -896,6 +917,11 @@ app.post('/api/midtrans/notification', async (req, res) => {
 
     console.log(`Received notification for order ${orderId}: ${transactionStatus}`);
 
+    if (orderId?.startsWith('MEMBER-')) {
+      const result=await memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification,resolveProviderStatus:orderId=>snap.transaction.status(orderId)});
+      return res.status(result.status).json(result.body);
+    }
+
     if (orderId?.startsWith('LOMBA-')) {
       const registration=await db.getCompetitionRegistrationByOrder(orderId);
       if(!registration) return res.status(404).json({message:'Registration not found'});
@@ -1244,19 +1270,17 @@ const handleSuccessTransaction = async (orderId, transactionId, notification) =>
       `;
 
       try {
+        const smtpPass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
         const transporter = nodemailer.createTransport({
-          host: 'mail.nicola.id',
-          port: 465,
-          secure: true,
-          auth: {
-            user: 'gmail@nicola.id',
-            pass: '@Nandha20'
-          }
+          host: process.env.SMTP_HOST,
+          port: Number(process.env.SMTP_PORT || 587),
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: smtpPass } : undefined
         });
 
         console.log('🚀 Sending Email now...');
         const info = await transporter.sendMail({
-          from: '"Nala System" <gmail@nicola.id>',
+          from: process.env.SMTP_FROM,
           to: emailRecipient,
           subject: emailSubject,
           html: emailHtml

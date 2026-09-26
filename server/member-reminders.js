@@ -1,0 +1,11 @@
+const safeError=e=>String(e?.code||e?.name||'delivery_failed').slice(0,100);
+export async function enqueueMemberReminders(pool,now=new Date()){
+ const rows=(await pool.query(`SELECT id,membership_expires_at FROM member_accounts WHERE renewal_emails_enabled AND suspended_at IS NULL AND membership_expires_at BETWEEN $1::timestamptz-interval '1 day' AND $1::timestamptz+interval '4 days'`,[now])).rows;
+ for(const x of rows){const hours=(new Date(x.membership_expires_at)-now)/3600000,key=hours>48?'h3':hours>0?'h1':'expired';await pool.query('INSERT INTO member_reminder_outbox(member_id,reminder_key,entitlement_expires_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[x.id,key,x.membership_expires_at])}
+ return rows.length;
+}
+export async function deliverMemberReminders(pool,sendMail,{limit=25,leaseMinutes=10}={}){
+ const client=await pool.connect();let jobs=[];try{await client.query('BEGIN');jobs=(await client.query(`WITH picked AS (SELECT id FROM member_reminder_outbox WHERE (status='pending' OR (status='sending' AND claimed_at<now()-($2||' minutes')::interval)) AND available_at<=now() ORDER BY id FOR UPDATE SKIP LOCKED LIMIT $1) UPDATE member_reminder_outbox o SET status='sending',claimed_at=now(),attempts=attempts+1 FROM picked WHERE o.id=picked.id RETURNING o.*`,[limit,leaseMinutes])).rows;await client.query('COMMIT')}catch(e){await client.query('ROLLBACK');throw e}finally{client.release()}
+ for(const job of jobs)try{const member=(await pool.query('SELECT email,name,renewal_emails_enabled,membership_expires_at FROM member_accounts WHERE id=$1 AND suspended_at IS NULL',[job.member_id])).rows[0];if(!member?.renewal_emails_enabled||!member.membership_expires_at||new Date(member.membership_expires_at).getTime()!==new Date(job.entitlement_expires_at).getTime()){await pool.query("UPDATE member_reminder_outbox SET status='obsolete',last_error=NULL WHERE id=$1",[job.id]);continue}await sendMail({to:member.email,purpose:'renewal',reminderKey:job.reminder_key,expiresAt:job.entitlement_expires_at});await pool.query("UPDATE member_reminder_outbox SET status='sent',sent_at=now(),last_error=NULL WHERE id=$1",[job.id])}catch(e){await pool.query("UPDATE member_reminder_outbox SET status='pending',available_at=now()+(LEAST(attempts,8)*attempts||' minutes')::interval,last_error=$2 WHERE id=$1",[job.id,safeError(e)])}
+ return jobs.length;
+}

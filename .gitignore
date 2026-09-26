@@ -17,6 +17,14 @@ dist-ssr
 server/.env
 .env
 .env.local
+.env.save
+.hermes/
+server/private-member-files/
+server/test-output/
+apps/member/dist/
+apps/member/.astro/
+/apps/member/
+/nala-member/
 
 # Editor directories and files
 .vscode/*

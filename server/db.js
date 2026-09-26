@@ -167,6 +167,7 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD || 'bot_wa',
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
+export { pool };
 
 // Test connection
 pool.on('connect', () => {
