@@ -77,7 +77,7 @@ const ADMIN_SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 const adminEmail = process.env.ADMIN_EMAIL || 'admin@artstudionala.com';
 const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH || '';
 const adminPassword = process.env.ADMIN_PASSWORD || '';
-const adminSecret = process.env.JWT_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.MIDTRANS_SERVER_KEY || 'dev-admin-secret-change-me';
+const adminSecret = process.env.ADMIN_SESSION_SECRET || process.env.JWT_SECRET || process.env.MIDTRANS_SERVER_KEY || 'dev-admin-secret-change-me';
 
 const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
