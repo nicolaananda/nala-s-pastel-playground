@@ -6,7 +6,7 @@ import axios from 'axios';
 import { db, initDatabase, pool } from './db.js';
 import { createMemberStore } from './member-db.js';
 import { parseCookies as parseCookieHeader, verifySignedJson } from './member-auth.js';
-import { createMemberRouter, memberNotification } from './member-routes.js';
+import { createMemberRouter, memberNotification, memberPaymentParameters } from './member-routes.js';
 import { createMemberAdminRouter } from './member-admin.js';
 import { createPhase7AdminRouter } from './member-phase7-admin.js';
 import { createPhase7PublicRouter } from './member-phase7.js';
@@ -67,7 +67,7 @@ export const memberMailer = async ({to,purpose,token,reminderKey,expiresAt}) => 
   await transporter.sendMail({from:process.env.SMTP_FROM,to,subject:renewal?'Pengingat masa aktif member Nala':purpose==='verify'?'Verifikasi akun Nala':'Reset password Nala',text:renewal?`Masa aktif member Nala ${reminderKey==='expired'?'telah berakhir':'akan berakhir'} pada ${new Date(expiresAt).toISOString()}. Perpanjang melalui ${base}/portal.`:`Buka ${base}/${route}?token=${encodeURIComponent(token)}. Tautan ini hanya dapat digunakan sekali.`});
 };
 const reconcileMemberOrder=async orderId=>{const verified=await snap.transaction.status(orderId),statusCode=String(verified.status_code||''),amount=String(verified.gross_amount||''),signature=crypto.createHash('sha512').update(`${orderId}${statusCode}${amount}${process.env.MIDTRANS_SERVER_KEY||''}`).digest('hex');return memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification:{order_id:orderId,status_code:statusCode,gross_amount:amount,signature_key:signature},resolveProviderStatus:async()=>verified})};
-app.use('/api/member',createMemberRouter({store:memberStore,sendMail:memberMailer,checkoutEnabled:process.env.MEMBER_CHECKOUT_ENABLED==='true',clientKey:process.env.MIDTRANS_CLIENT_KEY,snapUrl:process.env.MIDTRANS_IS_PRODUCTION==='true'?'https://app.midtrans.com/snap/snap.js':'https://app.sandbox.midtrans.com/snap/snap.js',production:process.env.NODE_ENV==='production',privateDir:memberPrivateDir,allowedOrigins,reconcileOrder:reconcileMemberOrder,createPayment:async({orderId,amount,email,name})=>{const transaction=await snap.createTransaction({transaction_details:{order_id:orderId,gross_amount:amount},item_details:[{id:'membership',price:amount,quantity:1,name:'Membership Nala'}],customer_details:{email,first_name:name},enabled_payments:['qris']});return {token:transaction.token,redirectUrl:transaction.redirect_url}}}));
+app.use('/api/member',createMemberRouter({store:memberStore,sendMail:memberMailer,checkoutEnabled:process.env.MEMBER_CHECKOUT_ENABLED==='true',clientKey:process.env.MIDTRANS_CLIENT_KEY,snapUrl:process.env.MIDTRANS_IS_PRODUCTION==='true'?'https://app.midtrans.com/snap/snap.js':'https://app.sandbox.midtrans.com/snap/snap.js',production:process.env.NODE_ENV==='production',privateDir:memberPrivateDir,allowedOrigins,reconcileOrder:reconcileMemberOrder,createPayment:async input=>{const transaction=await snap.createTransaction(memberPaymentParameters(input));return {token:transaction.token,redirectUrl:transaction.redirect_url}}}));
 app.use('/api/member-public',createPhase7PublicRouter({pool,artworkDir:path.join(memberPrivateDir,'artworks')}));
 
 const normalizeCode = (code = '') =>

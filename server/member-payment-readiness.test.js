@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import {createMemberRouter} from './member-routes.js';
+import {createMemberRouter,memberPaymentParameters} from './member-routes.js';
+
+test('member checkout requests the working QRIS channel configuration',()=>{
+ const payload=memberPaymentParameters({orderId:'MEMBER-TEST',amount:30000,email:'member@example.test',name:'Member'});
+ assert.deepEqual(payload.enabled_payments,['qris','other_qris']);
+ assert.equal(payload.transaction_details.gross_amount,30000);
+});
 
 test('checkout capability defaults disabled and reflects active plan config',async()=>{
  const queries=[];

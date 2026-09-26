@@ -9,6 +9,7 @@ const safe=fn=>async(req,res,next)=>{try{await fn(req,res,next)}catch(e){next(e)
 const text=(v,max)=>typeof v==='string'&&Buffer.byteLength(v)<=max?v:'';
 const redirectAllowed=value=>{try{const u=new URL(value);return u.protocol==='https:'&&/(^|\.)midtrans\.com$/.test(u.hostname)}catch{return false}};
 const providerTime=value=>{if(typeof value!=='string'||!/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d [+-]\d{4}$/.test(value))return null;const m=value.match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d) ([+-])(\d\d)(\d\d)$/),offset=(Number(m[8])*60+Number(m[9]))*(m[7]==='+'?1:-1),date=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]-offset,+m[6]));return Number.isNaN(date.valueOf())||Math.abs(Date.now()-date.valueOf())>366*86400000?null:date};
+export const memberPaymentParameters=({orderId,amount,email,name})=>({transaction_details:{order_id:orderId,gross_amount:amount},item_details:[{id:'membership',price:amount,quantity:1,name:'Membership Nala'}],customer_details:{email,first_name:name},enabled_payments:['qris','other_qris']});
 export const memberNotification=async({store,serverKey,notification,resolveProviderStatus})=>{
  if(!serverKey)return {status:503,body:{message:'Payment verification unavailable'}};
  const expected=crypto.createHash('sha512').update(`${notification.order_id||''}${notification.status_code||''}${notification.gross_amount||''}${serverKey||''}`).digest();
