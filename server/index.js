@@ -129,6 +129,9 @@ app.use('/api/admin/member', requireAdmin, express.json({limit:'14mb'}), createM
   pool,
   privateDir: memberPrivateDir,
   allowedOrigins,
+  providerStatus: orderId => snap.transaction.status(orderId),
+  cancelProvider: orderId => snap.transaction.cancel(orderId),
+  settleProviderOrder: status => {const statusCode=String(status.status_code||''),amount=String(status.gross_amount||''),signature=crypto.createHash('sha512').update(`${status.order_id}${statusCode}${amount}${process.env.MIDTRANS_SERVER_KEY||''}`).digest('hex');return memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification:{order_id:status.order_id,status_code:statusCode,gross_amount:amount,signature_key:signature},resolveProviderStatus:async()=>status})},
   reconcileOrder: async orderId => {
     const verified=await snap.transaction.status(orderId),statusCode=String(verified.status_code||''),amount=String(verified.gross_amount||'');
     const signature=crypto.createHash('sha512').update(`${orderId}${statusCode}${amount}${process.env.MIDTRANS_SERVER_KEY||''}`).digest('hex');
