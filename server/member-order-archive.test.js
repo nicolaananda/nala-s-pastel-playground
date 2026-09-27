@@ -17,7 +17,7 @@ test('admin order archive is fail-closed, race-safe, restorable, filtered, and a
  const schema=`member_archive_${crypto.randomBytes(8).toString('hex')}`,root=new pg.Pool({connectionString:raw});await root.query(`CREATE SCHEMA ${schema}`);await root.end();
  const pool=new pg.Pool({connectionString:raw,options:`-c search_path=${schema}`}),store=createMemberStore(pool),audits=[];let server;
  try{
-  for(const name of ['002-member-portal-phases-0-3.sql','003-member-experience-operations.sql','004-member-phase7.sql','005-member-reminder-obsolete.sql','006-member-order-archive.sql','007-member-checkout-lifecycle.sql'])await pool.query(await fs.readFile(new URL(`./migrations/${name}`,import.meta.url),'utf8'));
+  for(const name of ['002-member-portal-phases-0-3.sql','003-member-experience-operations.sql','004-member-phase7.sql','005-member-reminder-obsolete.sql','006-member-order-archive.sql','007-member-checkout-lifecycle.sql','008-member-course-entitlements.sql'])await pool.query(await fs.readFile(new URL(`./migrations/${name}`,import.meta.url),'utf8'));
   const member=(await pool.query("INSERT INTO member_accounts(email,name,password_hash,email_verified_at,membership_expires_at) VALUES('archive@example.test','Archive Test','x',now(),now()+interval '10 days') RETURNING id,membership_expires_at")).rows[0];
   const add=async(id,status='pending')=>pool.query('INSERT INTO member_orders(order_id,member_id,amount,duration_days,status) VALUES($1,$2,30000,30,$3)',[id,member.id,status]);
   for(const [id,status] of [['MEMBER-TERMINAL','expired'],['MEMBER-PENDING','pending'],['MEMBER-40400','pending'],['MEMBER-TIMEOUT','pending'],['MEMBER-PAID1','paid'],['MEMBER-RACE1','pending']])await add(id,status);
