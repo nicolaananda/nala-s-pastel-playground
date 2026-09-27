@@ -7,7 +7,7 @@ import sharp from 'sharp';
 const safe = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const id = value => /^[1-9]\d{0,18}$/.test(String(value)) ? String(value) : null;
 const clean = (value, max, min = 1) => typeof value === 'string' && value.trim().length >= min && value.trim().length <= max ? value.trim() : null;
-const entitlementSql = (member = '$1', course = '$2') => `(EXISTS(SELECT 1 FROM member_accounts a WHERE a.id=${member} AND a.email_verified_at IS NOT NULL AND a.suspended_at IS NULL AND a.membership_expires_at>now()) OR EXISTS(SELECT 1 FROM member_course_grants g WHERE g.member_id=${member} AND g.course_id=${course} AND g.expires_at>now()))`;
+const active = member => member.email_verified_at && member.membership_expires_at && new Date(member.membership_expires_at) > new Date();
 const filePath = (dir, name) => {
   if (!/^[0-9a-f-]{36}\.webp$/.test(name)) throw Object.assign(Error('invalid artwork path'), { status: 404 });
   const file = path.resolve(dir, name);
@@ -16,7 +16,7 @@ const filePath = (dir, name) => {
 };
 const flag = async (pool, key) => Boolean((await pool.query('SELECT enabled FROM member_feature_flags WHERE key=$1', [key])).rows[0]?.enabled);
 const enabled = key => safe(async (req, res, next) => (await flag(req.phase7Pool, key)) ? next() : res.status(403).json({ message: 'Fitur tidak aktif' }));
-
+const memberReady = (req, res) => active(req.member) || (res.status(403).json({ message: 'Akun terverifikasi dan keanggotaan aktif diperlukan' }), false);
 
 export const voucherHash = code => crypto.createHash('sha256').update(String(code).trim().toUpperCase()).digest('hex');
 
@@ -47,7 +47,7 @@ export const createPhase7MemberRouter = ({ pool, auth, artworkDir }) => {
   const router = express.Router();
   router.use(auth, (req, _res, next) => { req.phase7Pool = pool; next(); });
 
-  router.get('/plans', safe(async (_req, res) => res.json({ plans: (await pool.query(`SELECT p.id,p.name,p.duration_days AS "durationDays",p.price,p.access_mode AS "accessMode",COALESCE(json_agg(json_build_object('id',c.id,'title',c.title,'status',c.status) ORDER BY c.id) FILTER(WHERE c.id IS NOT NULL),'[]') courses FROM member_plans p LEFT JOIN member_plan_courses pc ON pc.plan_id=p.id LEFT JOIN member_courses c ON c.id=pc.course_id WHERE p.status='active' GROUP BY p.id ORDER BY p.duration_days,p.id`)).rows })));
+  router.get('/plans', safe(async (_req, res) => res.json({ plans: (await pool.query("SELECT id,name,duration_days AS \"durationDays\",price FROM member_plans WHERE status='active' ORDER BY duration_days,id")).rows })));
   router.post('/vouchers/redeem', safe(async (req, res) => {
     const code = clean(req.body?.code, 200);
     if (!code) return res.status(400).json({ message: 'Kode tidak valid' });
@@ -56,13 +56,14 @@ export const createPhase7MemberRouter = ({ pool, auth, artworkDir }) => {
 
   router.get('/questions', safe(async (req, res) => res.json({ enabled: await flag(pool, 'qa'), questions: (await pool.query('SELECT id,course_id AS "courseId",question,answer,status,created_at AS "createdAt",answered_at AS "answeredAt" FROM member_questions WHERE member_id=$1 ORDER BY created_at DESC', [req.member.id])).rows })));
   router.post('/questions', enabled('qa'), safe(async (req, res) => {
+    if (!memberReady(req, res)) return;
     const courseId = id(req.body?.courseId), question = clean(req.body?.question, 1000);
     if (!courseId || !question) return res.status(400).json({ message: 'Pertanyaan tidak valid' });
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
       await client.query('SELECT id FROM member_accounts WHERE id=$1 FOR UPDATE', [req.member.id]);
-      const course = await client.query(`SELECT 1 FROM member_courses WHERE id=$2 AND status='published' AND (release_at IS NULL OR release_at<=now()) AND ${entitlementSql()}`, [req.member.id, courseId]);
+      const course = await client.query("SELECT 1 FROM member_courses WHERE id=$1 AND status='published' AND (release_at IS NULL OR release_at<=now())", [courseId]);
       const quota = await client.query("SELECT count(*)::int n FROM member_questions WHERE member_id=$1 AND course_id=$2 AND created_at>now()-interval '30 days'", [req.member.id, courseId]);
       if (!course.rowCount) throw Object.assign(Error('Kelas tidak tersedia'), { status: 404 });
       if (quota.rows[0].n >= 2) throw Object.assign(Error('Kuota 2 pertanyaan per kelas dalam 30 hari tercapai'), { status: 429 });
@@ -79,6 +80,7 @@ export const createPhase7MemberRouter = ({ pool, auth, artworkDir }) => {
 
   router.get('/artworks', safe(async (req, res) => res.json({ enabled: await flag(pool, 'artwork'), artworks: (await pool.query('SELECT a.id,a.course_id AS "courseId",a.challenge_id AS "challengeId",a.title,a.feedback,a.created_at AS "createdAt",g.status AS "galleryStatus" FROM member_artworks a LEFT JOIN member_gallery_consents g ON g.artwork_id=a.id WHERE a.member_id=$1 ORDER BY a.created_at DESC', [req.member.id])).rows })));
   router.post('/artworks', express.json({ limit: '12mb' }), enabled('artwork'), safe(async (req, res) => {
+    if (!memberReady(req, res)) return;
     const courseId = id(req.body?.courseId), challengeId = id(req.body?.challengeId), title = clean(req.body?.title || 'Karya Member Nala', 100);
     if ((!courseId && !challengeId) || !title || typeof req.body?.base64 !== 'string' || req.body.base64.length > 11_200_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(req.body.base64)) return res.status(400).json({ message: 'Karya tidak valid atau melebihi 8MB' });
     const input = Buffer.from(req.body.base64, 'base64');
@@ -97,7 +99,7 @@ export const createPhase7MemberRouter = ({ pool, auth, artworkDir }) => {
       await client.query('BEGIN');
       await client.query('SELECT id FROM member_accounts WHERE id=$1 FOR UPDATE', [req.member.id]);
       if (Number((await client.query("SELECT count(*) n FROM member_artworks WHERE member_id=$1 AND created_at>now()-interval '30 days'", [req.member.id])).rows[0].n) >= 2) throw Object.assign(Error('Kuota 2 karya dalam 30 hari tercapai'), { status: 429 });
-      if (courseId && !(await client.query(`SELECT 1 FROM member_courses WHERE id=$2 AND status='published' AND (release_at IS NULL OR release_at<=now()) AND ${entitlementSql()}`, [req.member.id, courseId])).rowCount) throw Object.assign(Error('Kelas tidak tersedia untuk paket ini'), { status: 403 });
+      if (courseId && !(await client.query("SELECT 1 FROM member_courses WHERE id=$1 AND status='published' AND (release_at IS NULL OR release_at<=now())", [courseId])).rowCount) throw Object.assign(Error('Kelas tidak tersedia'), { status: 404 });
       if (challengeId && !(await client.query("SELECT 1 FROM member_challenges WHERE id=$1 AND status='published' AND opens_at<=now() AND closes_at>now()", [challengeId])).rowCount) throw Object.assign(Error('Tantangan belum dibuka atau sudah ditutup'), { status: 400 });
       const row = (await client.query('INSERT INTO member_artworks(member_id,course_id,challenge_id,title,storage_name) VALUES($1,$2,$3,$4,$5) RETURNING id,title', [req.member.id, courseId, challengeId, title, storageName])).rows[0];
       await fs.writeFile(target, output, { mode: 0o600, flag: 'wx' }); written = true;
@@ -137,13 +139,14 @@ export const createPhase7MemberRouter = ({ pool, auth, artworkDir }) => {
     res.json({ success: true });
   }));
 
-  const eligibilitySql = `c.status='published' AND (c.release_at IS NULL OR c.release_at<=now()) AND ${entitlementSql('$1','c.id')} AND cr.enabled AND EXISTS(SELECT 1 FROM member_lessons l JOIN member_chapters ch ON ch.id=l.chapter_id WHERE ch.course_id=c.id AND (l.release_at IS NULL OR l.release_at<=now())) AND NOT EXISTS(SELECT 1 FROM member_lessons l JOIN member_chapters ch ON ch.id=l.chapter_id WHERE ch.course_id=c.id AND (l.release_at IS NULL OR l.release_at<=now()) AND NOT EXISTS(SELECT 1 FROM member_progress p WHERE p.lesson_id=l.id AND p.member_id=$1 AND p.completed))`;
+  const eligibilitySql = `c.status='published' AND (c.release_at IS NULL OR c.release_at<=now()) AND cr.enabled AND EXISTS(SELECT 1 FROM member_lessons l JOIN member_chapters ch ON ch.id=l.chapter_id WHERE ch.course_id=c.id AND (l.release_at IS NULL OR l.release_at<=now())) AND NOT EXISTS(SELECT 1 FROM member_lessons l JOIN member_chapters ch ON ch.id=l.chapter_id WHERE ch.course_id=c.id AND (l.release_at IS NULL OR l.release_at<=now()) AND NOT EXISTS(SELECT 1 FROM member_progress p WHERE p.lesson_id=l.id AND p.member_id=$1 AND p.completed))`;
   router.get('/certificates', safe(async (req, res) => {
     const on = await flag(pool, 'certificates');
     const certificates = on ? (await pool.query(`SELECT c.id AS "courseId",c.title,cr.enabled,mc.certificate_id AS "certificateId",mc.course_title AS "courseTitle",mc.display_name AS "displayName",mc.issued_at AS "issuedAt",mc.revoked_at AS "revokedAt",(${eligibilitySql}) eligible FROM member_courses c JOIN member_certificate_rules cr ON cr.course_id=c.id LEFT JOIN member_certificates mc ON mc.course_id=c.id AND mc.member_id=$1 WHERE c.status='published' AND (c.release_at IS NULL OR c.release_at<=now()) AND cr.enabled ORDER BY c.id`, [req.member.id])).rows : [];
     res.json({ enabled: on, certificates });
   }));
   router.post('/certificates/:courseId', enabled('certificates'), safe(async (req, res) => {
+    if (!memberReady(req, res)) return;
     const courseId = id(req.params.courseId), displayName = clean(req.body?.displayName, 100, 2);
     if (!courseId || !displayName) return res.status(400).json({ message: 'Nama cetak tidak valid' });
     const row = (await pool.query(`INSERT INTO member_certificates(certificate_id,member_id,course_id,course_title,display_name) SELECT gen_random_uuid(),$1,c.id,c.title,$3 FROM member_courses c JOIN member_certificate_rules cr ON cr.course_id=c.id WHERE c.id=$2 AND ${eligibilitySql} ON CONFLICT(member_id,course_id) DO UPDATE SET display_name=member_certificates.display_name RETURNING certificate_id AS "certificateId",course_id AS "courseId",course_title AS "courseTitle",display_name AS "displayName",issued_at AS "issuedAt",revoked_at AS "revokedAt"`, [req.member.id, courseId, displayName])).rows[0];
