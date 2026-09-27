@@ -34,7 +34,6 @@ WITH mapping(plan_name,course_slug) AS (VALUES
  ('Paket C — 6 Bulan','contoh-menggambar-dasar'),('Paket C — 6 Bulan','contoh-mewarnai-crayon'),('Paket C — 6 Bulan','contoh-cat-air-pemula')
 ), expected(plan_name,n) AS (VALUES ('Paket A — Bulanan',1),('Paket B — 3 Bulan',2),('Paket C — 6 Bulan',3)), eligible AS (
  SELECT p.id,m.plan_name FROM member_plans p JOIN mapping m ON m.plan_name=p.name JOIN member_courses c ON c.slug=m.course_slug
- WHERE p.status='archived'
  GROUP BY p.id,m.plan_name HAVING count(*)=(SELECT n FROM expected e WHERE e.plan_name=m.plan_name)
 ), inserted AS (
  INSERT INTO member_plan_courses(plan_id,course_id)
