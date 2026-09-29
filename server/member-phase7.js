@@ -77,7 +77,7 @@ export const createPhase7MemberRouter = ({ pool, auth, artworkDir }) => {
     res.json({ enabled: on, challenges: on ? (await pool.query("SELECT id,title,prompt,opens_at AS \"opensAt\",closes_at AS \"closesAt\" FROM member_challenges WHERE status='published' ORDER BY opens_at DESC,id")).rows : [] });
   }));
 
-  router.get('/artworks', safe(async (req, res) => res.json({ enabled: await flag(pool, 'artwork'), artworks: (await pool.query('SELECT a.id,a.course_id AS "courseId",a.challenge_id AS "challengeId",a.title,a.feedback,a.created_at AS "createdAt",g.status AS "galleryStatus" FROM member_artworks a LEFT JOIN member_gallery_consents g ON g.artwork_id=a.id WHERE a.member_id=$1 ORDER BY a.created_at DESC', [req.member.id])).rows })));
+  router.get('/artworks', safe(async (req, res) => res.json({ enabled: await flag(pool, 'artwork'), artworks: (await pool.query('SELECT a.id,a.course_id AS "courseId",a.challenge_id AS "challengeId",a.title,a.feedback,a.score,a.evaluated_at AS "evaluatedAt",a.created_at AS "createdAt",g.status AS "galleryStatus" FROM member_artworks a LEFT JOIN member_gallery_consents g ON g.artwork_id=a.id WHERE a.member_id=$1 ORDER BY a.created_at DESC', [req.member.id])).rows })));
   router.post('/artworks', express.json({ limit: '12mb' }), enabled('artwork'), safe(async (req, res) => {
     const courseId = id(req.body?.courseId), challengeId = id(req.body?.challengeId), title = clean(req.body?.title || 'Karya Member Nala', 100);
     if ((!courseId && !challengeId) || !title || typeof req.body?.base64 !== 'string' || req.body.base64.length > 11_200_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(req.body.base64)) return res.status(400).json({ message: 'Karya tidak valid atau melebihi 8MB' });
