@@ -29,12 +29,20 @@ export const redeemVoucher = async (pool, memberId, code) => {
     const voucher = (await client.query('SELECT * FROM member_vouchers WHERE code_hash=$1 FOR UPDATE', [voucherHash(code)])).rows[0];
     if (!voucher || voucher.archived_at || !voucher.expires_at || new Date(voucher.expires_at) <= new Date() || voucher.uses >= voucher.max_uses) throw Object.assign(Error('Voucher tidak valid, kedaluwarsa, atau habis'), { status: 400 });
     if ((await client.query('SELECT 1 FROM member_voucher_redemptions WHERE voucher_id=$1 AND member_id=$2', [voucher.id, memberId])).rowCount) throw Object.assign(Error('Voucher sudah digunakan akun ini'), { status: 409 });
-    const updated = (await client.query("UPDATE member_accounts SET membership_expires_at=GREATEST(COALESCE(membership_expires_at,now()),now())+($2::text||' days')::interval,updated_at=now() WHERE id=$1 RETURNING membership_expires_at", [memberId, voucher.days])).rows[0];
-    await client.query('INSERT INTO member_voucher_redemptions(voucher_id,member_id) VALUES($1,$2)', [voucher.id, memberId]);
+    const plan = voucher.plan_id ? (await client.query('SELECT id,name,duration_days,access_mode FROM member_plans WHERE id=$1 FOR SHARE', [voucher.plan_id])).rows[0] : null;
+    if (voucher.plan_id && !plan) throw Object.assign(Error('Voucher tidak valid, kedaluwarsa, atau habis'), { status: 400 });
+    const redemption = (await client.query('INSERT INTO member_voucher_redemptions(voucher_id,member_id) VALUES($1,$2) RETURNING id', [voucher.id, memberId])).rows[0];
+    let membershipExpiresAt = member.membership_expires_at, courses = [];
+    if (!plan || plan.access_mode === 'legacy_all') {
+      membershipExpiresAt = (await client.query("UPDATE member_accounts SET membership_expires_at=GREATEST(COALESCE(membership_expires_at,now()),now())+($2::text||' days')::interval,updated_at=now() WHERE id=$1 RETURNING membership_expires_at", [memberId, voucher.days])).rows[0].membership_expires_at;
+    } else {
+      courses = (await client.query(`WITH selected AS (SELECT c.id,c.title FROM member_plan_courses pc JOIN member_courses c ON c.id=pc.course_id WHERE pc.plan_id=$2), starts AS (SELECT s.id,s.title,GREATEST(now(),COALESCE((SELECT max(g.expires_at) FROM member_course_grants g WHERE g.member_id=$1 AND g.course_id=s.id),now())) starts_at FROM selected s), inserted AS (INSERT INTO member_course_grants(member_id,course_id,source_voucher_redemption_id,starts_at,expires_at) SELECT $1,id,$3,starts_at,starts_at+($4::text||' days')::interval FROM starts RETURNING course_id,expires_at) SELECT i.course_id AS "courseId",s.title,i.expires_at AS "expiresAt" FROM inserted i JOIN selected s ON s.id=i.course_id ORDER BY s.id`, [memberId, plan.id, redemption.id, voucher.days])).rows;
+      if (!courses.length) throw Object.assign(Error('Voucher tidak memiliki kelas'), { status: 400 });
+    }
     await client.query('UPDATE member_vouchers SET uses=uses+1 WHERE id=$1', [voucher.id]);
-    await client.query("INSERT INTO member_access_ledger(member_id,source_type,source_id,days_delta,previous_expires_at,resulting_expires_at,reason,actor) VALUES($1,'admin_grant',$2,$3,$4,$5,'voucher','voucher')", [memberId, `voucher:${voucher.id}:${memberId}`, voucher.days, member.membership_expires_at, updated.membership_expires_at]);
+    await client.query("INSERT INTO member_access_ledger(member_id,source_type,source_id,days_delta,previous_expires_at,resulting_expires_at,reason,actor) VALUES($1,'admin_grant',$2,$3,$4,$5,'voucher','voucher')", [memberId, `voucher:${voucher.id}:${memberId}`, voucher.days, member.membership_expires_at, membershipExpiresAt]);
     await client.query('COMMIT');
-    return updated.membership_expires_at;
+    return { membershipExpiresAt, planName: plan?.name || voucher.label, courses };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -51,7 +59,7 @@ export const createPhase7MemberRouter = ({ pool, auth, artworkDir }) => {
   router.post('/vouchers/redeem', safe(async (req, res) => {
     const code = clean(req.body?.code, 200);
     if (!code) return res.status(400).json({ message: 'Kode tidak valid' });
-    res.json({ membershipExpiresAt: await redeemVoucher(pool, req.member.id, code) });
+    res.json(await redeemVoucher(pool, req.member.id, code));
   }));
 
   router.get('/questions', safe(async (req, res) => res.json({ enabled: await flag(pool, 'qa'), questions: (await pool.query('SELECT id,course_id AS "courseId",question,answer,status,created_at AS "createdAt",answered_at AS "answeredAt" FROM member_questions WHERE member_id=$1 ORDER BY created_at DESC', [req.member.id])).rows })));
