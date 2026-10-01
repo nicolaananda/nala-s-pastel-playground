@@ -28,8 +28,14 @@ export const redeemVoucher = async (pool, memberId, code) => {
     if (!member || !member.email_verified_at || member.suspended_at) throw Object.assign(Error('Akun tidak memenuhi syarat'), { status: 403 });
     const voucher = (await client.query('SELECT * FROM member_vouchers WHERE code_hash=$1 FOR UPDATE', [voucherHash(code)])).rows[0];
     if (!voucher || voucher.archived_at || !voucher.expires_at || new Date(voucher.expires_at) <= new Date() || voucher.uses >= voucher.max_uses) throw Object.assign(Error('Voucher tidak valid, kedaluwarsa, atau habis'), { status: 400 });
-    if ((await client.query('SELECT 1 FROM member_voucher_redemptions WHERE voucher_id=$1 AND member_id=$2', [voucher.id, memberId])).rowCount) throw Object.assign(Error('Voucher sudah digunakan akun ini'), { status: 409 });
-    const plan = voucher.plan_id ? (await client.query('SELECT id,name,duration_days,access_mode FROM member_plans WHERE id=$1 FOR SHARE', [voucher.plan_id])).rows[0] : null;
+    if ((await client.query('SELECT 1 FROM member_voucher_redemptions WHERE voucher_id=$1 AND member_id=$2', [voucher.id, memberId])).rowCount || (await client.query("SELECT 1 FROM member_orders WHERE voucher_id=$1 AND member_id=$2 AND status IN ('pending','paid')", [voucher.id, memberId])).rowCount) throw Object.assign(Error('Voucher sudah digunakan akun ini'), { status: 409 });
+    const plan = voucher.plan_id ? (await client.query('SELECT id,name,price,duration_days,access_mode FROM member_plans WHERE id=$1 FOR SHARE', [voucher.plan_id])).rows[0] : null;
+    if (voucher.discount_percent < 100) {
+      if (!plan) throw Object.assign(Error('Voucher tidak valid, kedaluwarsa, atau habis'), { status: 400 });
+      const discountAmount = Math.floor(Number(plan.price) * Number(voucher.discount_percent) / 100);
+      await client.query('COMMIT');
+      return { result: 'checkout', planId: plan.id, planName: plan.name, discountPercent: voucher.discount_percent, subtotalAmount: plan.price, discountAmount, amount: Number(plan.price) - discountAmount };
+    }
     if (voucher.plan_id && !plan) throw Object.assign(Error('Voucher tidak valid, kedaluwarsa, atau habis'), { status: 400 });
     const redemption = (await client.query('INSERT INTO member_voucher_redemptions(voucher_id,member_id) VALUES($1,$2) RETURNING id', [voucher.id, memberId])).rows[0];
     let membershipExpiresAt = member.membership_expires_at, courses = [];
@@ -42,7 +48,7 @@ export const redeemVoucher = async (pool, memberId, code) => {
     await client.query('UPDATE member_vouchers SET uses=uses+1 WHERE id=$1', [voucher.id]);
     await client.query("INSERT INTO member_access_ledger(member_id,source_type,source_id,days_delta,previous_expires_at,resulting_expires_at,reason,actor) VALUES($1,'admin_grant',$2,$3,$4,$5,'voucher','voucher')", [memberId, `voucher:${voucher.id}:${memberId}`, voucher.days, member.membership_expires_at, membershipExpiresAt]);
     await client.query('COMMIT');
-    return { membershipExpiresAt, planName: plan?.name || voucher.label, courses };
+    return { result: 'granted', membershipExpiresAt, planName: plan?.name || voucher.label, courses };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
