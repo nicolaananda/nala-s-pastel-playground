@@ -1,0 +1,10 @@
+BEGIN;
+ALTER TABLE member_vouchers ADD COLUMN plan_id BIGINT REFERENCES member_plans(id) ON DELETE RESTRICT;
+ALTER TABLE member_voucher_redemptions DROP CONSTRAINT member_voucher_redemptions_pkey;
+ALTER TABLE member_voucher_redemptions ADD COLUMN id BIGSERIAL PRIMARY KEY;
+ALTER TABLE member_voucher_redemptions ADD CONSTRAINT member_voucher_redemptions_voucher_member_key UNIQUE(voucher_id,member_id);
+ALTER TABLE member_course_grants ALTER COLUMN source_order_id DROP NOT NULL;
+ALTER TABLE member_course_grants ADD COLUMN source_voucher_redemption_id BIGINT REFERENCES member_voucher_redemptions(id) ON DELETE RESTRICT;
+ALTER TABLE member_course_grants ADD CONSTRAINT member_course_grants_one_source CHECK (num_nonnulls(source_order_id,source_voucher_redemption_id)=1);
+CREATE UNIQUE INDEX member_course_grants_voucher_course_unique ON member_course_grants(source_voucher_redemption_id,course_id) WHERE source_voucher_redemption_id IS NOT NULL;
+COMMIT;
