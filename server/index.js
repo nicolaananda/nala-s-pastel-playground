@@ -55,7 +55,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use((req,res,next)=>req.method==='POST'&&['/api/admin/member/worksheets','/api/member/program/artworks'].includes(req.path)?next():express.json({limit:'2mb'})(req,res,next));
+app.use((req,res,next)=>req.method==='POST'&&['/api/admin/member/worksheets','/api/admin/member/course-thumbnails','/api/member/program/artworks'].includes(req.path)?next():express.json({limit:'2mb'})(req,res,next));
 app.use('/uploads', express.static(uploadDir));
 
 const memberStore = createMemberStore(pool);
@@ -308,6 +308,30 @@ const uploadToR2 = async ({ key, buffer, contentType }) => {
 
   return `${config.publicUrl}/${encodedKey}`;
 };
+
+const strictBase64 = value => {
+  if (typeof value !== 'string') return null;
+  const raw=value.replace(/^data:[^,]+;base64,/,''),bytes=Math.floor(raw.length*3/4);
+  if (!raw || raw.length%4 || bytes>8*1024*1024 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(raw)) return null;
+  const buffer=Buffer.from(raw,'base64');
+  return buffer.length<=8*1024*1024&&buffer.toString('base64')===raw?buffer:null;
+};
+
+app.post('/api/admin/member/course-thumbnails',requireAdmin,express.json({limit:'12mb'}),async(req,res)=>{
+  try{
+    const buffer=strictBase64(req.body?.base64);
+    if(!buffer)return res.status(400).json({message:'Gambar base64 tidak valid atau melebihi 8MB'});
+    const jpeg=buffer[0]===0xff&&buffer[1]===0xd8&&buffer[2]===0xff,png=buffer.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])),webp=buffer.subarray(0,4).toString()==='RIFF'&&buffer.subarray(8,12).toString()==='WEBP';
+    if(!jpeg&&!png&&!webp)return res.status(400).json({message:'Hanya gambar JPG, PNG, atau WebP yang diizinkan'});
+    const input=sharp(buffer,{limitInputPixels:25_000_000,failOn:'error'}),metadata=await input.metadata();
+    if(!metadata.width||!metadata.height||metadata.width*metadata.height>25_000_000||!['jpeg','png','webp'].includes(metadata.format))return res.status(400).json({message:'Dimensi atau format gambar tidak valid'});
+    const optimized=await input.rotate().webp({quality:70}).toBuffer(),key=`member/course-thumbnails/${crypto.randomUUID()}.webp`;
+    const url=await uploadToR2({key,buffer:optimized,contentType:'image/webp'});
+    if(!url)return res.status(503).json({message:'Cloudflare R2 belum dikonfigurasi lengkap'});
+    await db.logAdminAction({adminEmail:req.admin.email,action:'member_upload_course_thumbnail',entityType:'member_course_thumbnail',details:{url,key,originalSize:buffer.length,optimizedSize:optimized.length}});
+    res.status(201).json({url});
+  }catch(error){console.error('Course thumbnail upload error:',error);res.status(error.type==='entity.too.large'?413:error.status||400).json({message:error.type==='entity.too.large'?'Permintaan terlalu besar':'Gambar tidak valid'})}
+});
 
 const deleteFromR2 = async (key) => {
   const config = r2Config();

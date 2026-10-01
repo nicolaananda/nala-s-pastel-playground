@@ -7,7 +7,7 @@ import sharp from 'sharp';
 const safe = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const id = value => /^[1-9]\d{0,18}$/.test(String(value)) ? String(value) : null;
 const clean = (value, max, min = 1) => typeof value === 'string' && value.trim().length >= min && value.trim().length <= max ? value.trim() : null;
-const entitlementSql = (member = '$1', course = '$2') => `(EXISTS(SELECT 1 FROM member_accounts a WHERE a.id=${member} AND a.email_verified_at IS NOT NULL AND a.suspended_at IS NULL AND a.membership_expires_at>now()) OR EXISTS(SELECT 1 FROM member_course_grants g WHERE g.member_id=${member} AND g.course_id=${course} AND g.expires_at>now()))`;
+const entitlementSql = (member = '$1', course = '$2') => `(EXISTS(SELECT 1 FROM member_accounts a WHERE a.id=${member} AND a.email_verified_at IS NOT NULL AND a.suspended_at IS NULL AND a.membership_expires_at>now()) OR EXISTS(SELECT 1 FROM member_course_grants g WHERE g.member_id=${member} AND g.course_id=${course} AND g.revoked_at IS NULL AND g.expires_at>now()))`;
 const filePath = (dir, name) => {
   if (!/^[0-9a-f-]{36}\.webp$/.test(name)) throw Object.assign(Error('invalid artwork path'), { status: 404 });
   const file = path.resolve(dir, name);
@@ -42,7 +42,7 @@ export const redeemVoucher = async (pool, memberId, code) => {
     if (!plan || plan.access_mode === 'legacy_all') {
       membershipExpiresAt = (await client.query("UPDATE member_accounts SET membership_expires_at=GREATEST(COALESCE(membership_expires_at,now()),now())+($2::text||' days')::interval,updated_at=now() WHERE id=$1 RETURNING membership_expires_at", [memberId, voucher.days])).rows[0].membership_expires_at;
     } else {
-      courses = (await client.query(`WITH selected AS (SELECT c.id,c.title FROM member_plan_courses pc JOIN member_courses c ON c.id=pc.course_id WHERE pc.plan_id=$2), starts AS (SELECT s.id,s.title,GREATEST(now(),COALESCE((SELECT max(g.expires_at) FROM member_course_grants g WHERE g.member_id=$1 AND g.course_id=s.id),now())) starts_at FROM selected s), inserted AS (INSERT INTO member_course_grants(member_id,course_id,source_voucher_redemption_id,starts_at,expires_at) SELECT $1,id,$3,starts_at,starts_at+($4::text||' days')::interval FROM starts RETURNING course_id,expires_at) SELECT i.course_id AS "courseId",s.title,i.expires_at AS "expiresAt" FROM inserted i JOIN selected s ON s.id=i.course_id ORDER BY s.id`, [memberId, plan.id, redemption.id, voucher.days])).rows;
+      courses = (await client.query(`WITH selected AS (SELECT c.id,c.title FROM member_plan_courses pc JOIN member_courses c ON c.id=pc.course_id WHERE pc.plan_id=$2), starts AS (SELECT s.id,s.title,GREATEST(now(),COALESCE((SELECT max(g.expires_at) FROM member_course_grants g WHERE g.member_id=$1 AND g.course_id=s.id AND g.revoked_at IS NULL),now())) starts_at FROM selected s), inserted AS (INSERT INTO member_course_grants(member_id,course_id,source_voucher_redemption_id,starts_at,expires_at) SELECT $1,id,$3,starts_at,starts_at+($4::text||' days')::interval FROM starts RETURNING course_id,expires_at) SELECT i.course_id AS "courseId",s.title,i.expires_at AS "expiresAt" FROM inserted i JOIN selected s ON s.id=i.course_id ORDER BY s.id`, [memberId, plan.id, redemption.id, voucher.days])).rows;
       if (!courses.length) throw Object.assign(Error('Voucher tidak memiliki kelas'), { status: 400 });
     }
     await client.query('UPDATE member_vouchers SET uses=uses+1 WHERE id=$1', [voucher.id]);
