@@ -12,9 +12,7 @@ import { AccessRecord, adminApi, CompetitionRegistration, ContentItem, ContentTy
 import SimpleContent from "@/components/SimpleContent";
 import BookVideoEditor from "@/components/BookVideoEditor";
 import { normalizeVideoMetadata } from "../../shared/book-videos.js";
-import MemberCoursesAdmin from "@/components/MemberCoursesAdmin";
-import MemberOperationsAdmin from "@/components/MemberOperationsAdmin";
-import MemberProgramAdmin from "@/components/MemberProgramAdmin";
+
 
 const emptyItem: ContentItem = {
   type: "book",
@@ -61,7 +59,7 @@ const clampExcerpt = (value: string) => value.replace(/<[^>]+>/g, "").replace(/\
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { module = "content" } = useParams();
-  const modules = ["content","member-courses","member-operations","member-program","competitions","premium-access","uploads","audit"];
+  const modules = ["content","competitions","premium-access","uploads","audit"];
   const [adminEmail, setAdminEmail] = useState("");
   const [items, setItems] = useState<ContentItem[]>([]);
   const [transactions, setTransactions] = useState<AccessRecord[]>([]);
@@ -98,7 +96,6 @@ const AdminDashboard = () => {
   const loadAll = async () => {
     const me = await adminApi.me();
     setAdminEmail(me.admin.email);
-    if (["member-courses","member-operations","member-program"].includes(module)) return;
     const [content, transactionData, auditData, mediaData, registrationData] = await Promise.all([
       adminApi.listContent(), adminApi.transactions(), adminApi.auditLogs(), adminApi.media(), adminApi.competitionRegistrations(),
     ]);
@@ -299,9 +296,7 @@ const AdminDashboard = () => {
         <Tabs value={modules.includes(module) ? module : "content"} onValueChange={(value)=>navigate(`/admin/${value}`)}>
           <TabsList className="sticky top-3 z-10 flex h-auto flex-wrap justify-start rounded-full border-2 border-[#2b2118] bg-white/90 p-2 shadow-[6px_6px_0_#2b2118] backdrop-blur">
             <TabsTrigger value="content">Konten</TabsTrigger>
-            <TabsTrigger value="member-courses">Kursus Member</TabsTrigger>
-            <TabsTrigger value="member-operations">Operasi Member</TabsTrigger>
-            <TabsTrigger value="member-program">Program Member</TabsTrigger>
+
             <TabsTrigger value="competitions">Lomba</TabsTrigger>
             <TabsTrigger value="premium-access">Premium Access</TabsTrigger>
             <TabsTrigger value="uploads">Uploads</TabsTrigger>
@@ -514,9 +509,6 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="member-courses" className="mt-6"><MemberCoursesAdmin /></TabsContent>
-          <TabsContent value="member-operations" className="mt-6"><MemberOperationsAdmin /></TabsContent>
-          <TabsContent value="member-program" className="mt-6"><MemberProgramAdmin /></TabsContent>
 
           <TabsContent value="competitions" className="space-y-4"><Card><CardHeader><CardTitle>Kompetisi</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-2">{items.filter(item=>item.type==="competition").map(item=><div key={item.id} className="rounded-xl border p-4"><b>{item.title}</b><p className="text-sm text-muted-foreground">{item.status}</p><Button className="mt-3" asChild><Link to={`/admin/competitions/${item.id}/participants`}>Kelola peserta</Link></Button></div>)}</CardContent></Card></TabsContent>
 
