@@ -558,8 +558,22 @@ app.delete('/api/admin/media/:id', requireAdmin, async (req, res) => {
 });
 
 app.get('/api/admin/audit-logs', requireAdmin, async (req, res) => {
-  const logs = await db.getAuditLogs();
-  res.json({ logs });
+  const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 200) : '';
+  const page = Math.max(1, Math.min(100000, Number(req.query.page) || 1));
+  const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
+  const format = req.query.format === 'csv' ? 'csv' : 'json';
+  const values = [`%${q}%`, limit, (page - 1) * limit];
+  const where = "($1='' OR admin_email ILIKE $1 OR action ILIKE $1 OR entity_type ILIKE $1 OR entity_id ILIKE $1)";
+  const [rows, count] = await Promise.all([
+    pool.query(`SELECT id,admin_email,action,entity_type,entity_id,details,created_at FROM admin_audit_logs WHERE ${where} ORDER BY created_at DESC LIMIT $2 OFFSET $3`, values),
+    pool.query(`SELECT count(*)::int total FROM admin_audit_logs WHERE ${where}`, [values[0]]),
+  ]);
+  if (format === 'csv') {
+    const esc = value => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const csv = ['id,admin_email,action,entity_type,entity_id,created_at', ...rows.rows.map(row => [row.id,row.admin_email,row.action,row.entity_type,row.entity_id,row.created_at?.toISOString?.() || row.created_at].map(esc).join(','))].join('\n');
+    return res.type('text/csv').attachment('audit-log.csv').send(csv);
+  }
+  res.json({ logs: rows.rows.map(row => ({id:row.id,adminEmail:row.admin_email,action:row.action,entityType:row.entity_type,entityId:row.entity_id,details:row.details||{},createdAt:row.created_at})), total: count.rows[0].total, page, limit });
 });
 
 // Debug endpoint to check Midtrans configuration
