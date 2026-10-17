@@ -700,10 +700,11 @@ app.post('/api/midtrans/create-payment-link', async (req, res) => {
       customer: parameter.customer_details?.email
     });
 
-    // Midtrans webhook may omit customer address, so retain checkout details server-side.
+    // Retain checkout items too: Midtrans webhooks may omit both items and address.
+    // ponytail: reuse the existing JSON snapshot; split storage when order management needs it.
     await db.savePaymentOrderDetails(
       parameter.transaction_details.order_id,
-      parameter.customer_details
+      { ...parameter.customer_details, item_details: Array.isArray(parameter.item_details) ? parameter.item_details : [] }
     );
 
     // Create transaction
@@ -1141,7 +1142,11 @@ const sendTelegramNotification = async (orderId, transactionId, notification, co
       minute: '2-digit',
     });
 
-    const { title, body: productBody } = buildProductSection(orderId, notification);
+    const savedItems = savedCustomer?.item_details;
+    const { title, body: productBody } = buildProductSection(orderId, {
+      ...notification,
+      item_details: Array.isArray(savedItems) && savedItems.length ? savedItems : notification.item_details,
+    });
 
     const sections = [];
 
