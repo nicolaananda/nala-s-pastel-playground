@@ -4,8 +4,10 @@ import dotenv from 'dotenv';
 import midtransClient from 'midtrans-client';
 import axios from 'axios';
 import { db, initDatabase, pool } from './db.js';
+import { createAdminSessionStore } from './admin-session-store.js';
 import { createMemberStore } from './member-db.js';
-import { parseCookies as parseCookieHeader, verifySignedJson } from './member-auth.js';
+import {adminLoginLimit} from './admin-login-limit.js';
+import { parseCookies as parseCookieHeader, verifySignedJson, verifyPassword, validPassword } from './member-auth.js';
 import { createMemberRouter, memberNotification, memberPaymentParameters } from './member-routes.js';
 import { createMemberAdminRouter } from './member-admin.js';
 import { createPhase7AdminRouter } from './member-phase7-admin.js';
@@ -74,6 +76,7 @@ app.use('/api/member-public',createPhase7PublicRouter({pool,artworkDir:path.join
 const normalizeCode = (code = '') =>
   code.trim().toUpperCase();
 
+const adminSessions = createAdminSessionStore(pool);
 const ADMIN_COOKIE_NAME = 'nala_admin_session';
 const ADMIN_SESSION_TTL_MS = 1000 * 60 * 60 * 8;
 const adminEmail = process.env.ADMIN_EMAIL || 'admin@artstudionala.com';
@@ -114,14 +117,23 @@ const setAdminCookie = (res, token) => {
   });
 };
 
-const requireAdmin = (req, res, next) => {
+const requireAdmin = async (req, res, next) => {
+ try {
   const cookies = parseCookies(req.headers.cookie || '');
   const session = verifySession(cookies[ADMIN_COOKIE_NAME]);
-  if (!session || session.email !== adminEmail) {
+  if (!session || !await adminSessions.valid(cookies[ADMIN_COOKIE_NAME],session.email)) {
     return res.status(401).json({ message: 'Admin login required' });
   }
-  req.admin = { email: session.email };
+  const owner=session.email===adminEmail;
+  if(!owner){
+   const teacher=(await pool.query('SELECT enabled FROM member_teachers WHERE email=$1',[session.email])).rows[0];
+   if(!teacher?.enabled)return res.status(401).json({message:'Admin login required'});
+   const route=req.originalUrl.split('?')[0];
+   if(!['/api/admin/me','/api/admin/logout','/api/admin/logout-all'].includes(route)&&!route.startsWith('/api/admin/member/')&&!/^\/api\/admin\/member-program\/artworks(?:\/[1-9]\d*\/(?:image|feedback))?$/.test(route))return res.status(403).json({message:'Akses pengajar tidak diizinkan'});
+  }
+  req.admin = { email: session.email, role:owner?'owner':'teacher' };
   next();
+ } catch(error) { next(error); }
 };
 
 const adminBoundary=(req,res,next)=>{res.set('Cache-Control','private, no-store');if(!['GET','HEAD','OPTIONS'].includes(req.method)&&(!req.headers.origin||!allowedOrigins.includes(req.headers.origin)))return res.status(403).json({message:'Origin tidak diizinkan'});next()};
@@ -413,13 +425,17 @@ app.get('/api/content/:type/:slug', async (req, res) => {
   }
 });
 
-app.post('/api/admin/login', async (req, res) => {
+app.post('/api/admin/login', adminLoginLimit(), async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (email !== adminEmail || !isAdminPasswordValid(password)) {
+    const { email, password } = req.body||{};
+    if(typeof email!=='string'||email.length>254||typeof password!=='string'||Buffer.byteLength(password)>200)return res.status(401).json({message:'Email atau password admin salah'});
+    const teacher=email!==adminEmail&&typeof email==='string'&&email.length<=254&&validPassword(password)?(await pool.query('SELECT password_hash FROM member_teachers WHERE email=$1 AND enabled=true',[email])).rows[0]:null;
+    if (!(email===adminEmail?isAdminPasswordValid(password):teacher&&await verifyPassword(password,teacher.password_hash))) {
       return res.status(401).json({ message: 'Email atau password admin salah' });
     }
-    const token = signSession({ email, expiresAt: Date.now() + ADMIN_SESSION_TTL_MS });
+    const expiresAt=Date.now()+ADMIN_SESSION_TTL_MS;
+    const token = signSession({ email, expiresAt, nonce:crypto.randomUUID() });
+    await adminSessions.issue(token,email,expiresAt);
     setAdminCookie(res, token);
     await db.logAdminAction({ adminEmail: email, action: 'login', entityType: 'admin_session', details: { email } });
     res.json({ admin: { email } });
@@ -429,10 +445,22 @@ app.post('/api/admin/login', async (req, res) => {
   }
 });
 
-app.post('/api/admin/logout', requireAdmin, async (req, res) => {
+app.post('/api/admin/logout', requireAdmin, async (req, res, next) => {
+ try {
+  await adminSessions.revoke(parseCookies(req.headers.cookie||'')[ADMIN_COOKIE_NAME]);
   res.clearCookie(ADMIN_COOKIE_NAME, { path: '/' });
   await db.logAdminAction({ adminEmail: req.admin.email, action: 'logout', entityType: 'admin_session' });
   res.json({ success: true });
+ } catch(error) { next(error); }
+});
+
+app.post('/api/admin/logout-all', requireAdmin, async (req, res, next) => {
+ try {
+  await adminSessions.revokeAll(req.admin.email);
+  res.clearCookie(ADMIN_COOKIE_NAME, { path: '/' });
+  await db.logAdminAction({ adminEmail: req.admin.email, action: 'logout_all', entityType: 'admin_session' });
+  res.json({ success: true });
+ } catch(error) { next(error); }
 });
 
 app.get('/api/admin/me', requireAdmin, (req, res) => {

@@ -15,7 +15,7 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function fixture(provider={}){
  const schema=`checkout_${crypto.randomBytes(6).toString('hex')}`,root=new pg.Pool({connectionString:raw});await root.query(`CREATE SCHEMA ${schema}`);await root.end();
  const pool=new pg.Pool({connectionString:raw,options:`-c search_path=${schema}`});
- for(const name of ['002-member-portal-phases-0-3.sql','003-member-experience-operations.sql','004-member-phase7.sql','005-member-reminder-obsolete.sql','006-member-order-archive.sql','007-member-checkout-lifecycle.sql','008-member-course-entitlements.sql'])await pool.query(await fs.readFile(new URL(`./migrations/${name}`,import.meta.url),'utf8'));
+ for(const name of ['002-member-portal-phases-0-3.sql', '003-member-experience-operations.sql', '004-member-phase7.sql', '005-member-reminder-obsolete.sql', '006-member-order-archive.sql', '007-member-checkout-lifecycle.sql', '008-member-course-entitlements.sql', '009-member-learning-flow.sql', '010-member-product-vouchers.sql', '011-member-percentage-vouchers.sql', '012-member-admin-course-grants.sql', '013-member-lesson-images.sql', '014-member-artwork-lessons.sql', '015-admin-sessions.sql','017-teacher-courses.sql'])await pool.query(await fs.readFile(new URL(`./migrations/${name}`,import.meta.url),'utf8'));
  const member=(await pool.query("INSERT INTO member_accounts(email,name,password_hash,email_verified_at) VALUES('checkout@example.test','Checkout','x',now()) RETURNING *")).rows[0];
  await pool.query("INSERT INTO member_plans(name,duration_days,price,status) VALUES('30 hari',30,30000,'active'),('90 hari',90,80000,'active')");
  const store=createMemberStore(pool);store.sessionMember=async()=>member;
