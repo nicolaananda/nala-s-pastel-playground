@@ -2,7 +2,7 @@
 export const teacherScope=pool=>async(req,res,next)=>{
  if(req.admin?.role!=='teacher')return next();
  try{
-  const match=/^\/(courses|chapters|lessons|worksheets)(?:\/([1-9]\d{0,18}))?\/?$/.exec(req.path);
+  const match=/^\/(courses|chapters|lessons|worksheets)(?:\/([1-9]\d{0,18}))?(?:\/assignment)?\/?$/.exec(req.path);
   if(!match)return res.status(403).json({message:'Akses pengajar tidak diizinkan'});
   const [,kind,id]=match;
   if(kind==='courses'&&!id&&req.method==='GET')return next();
