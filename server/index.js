@@ -12,6 +12,7 @@ import { createMemberRouter, memberNotification, memberPaymentParameters } from 
 import { createMemberAdminRouter } from './member-admin.js';
 import { createPhase7AdminRouter } from './member-phase7-admin.js';
 import { createPhase7PublicRouter } from './member-phase7.js';
+import { createMilestoneCRouter, recordOperationalEvent } from './member-milestone-c.js';
 import TelegramBot from 'node-telegram-bot-api';
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
@@ -129,7 +130,7 @@ const requireAdmin = async (req, res, next) => {
    const teacher=(await pool.query('SELECT enabled FROM member_teachers WHERE email=$1',[session.email])).rows[0];
    if(!teacher?.enabled)return res.status(401).json({message:'Admin login required'});
    const route=req.originalUrl.split('?')[0];
-   if(!['/api/admin/me','/api/admin/logout','/api/admin/logout-all'].includes(route)&&!route.startsWith('/api/admin/member/')&&!/^\/api\/admin\/member-program\/artworks(?:\/[1-9]\d*\/(?:image|feedback))?$/.test(route))return res.status(403).json({message:'Akses pengajar tidak diizinkan'});
+   if(!['/api/admin/me','/api/admin/logout','/api/admin/logout-all'].includes(route)&&!route.startsWith('/api/admin/member/')&&!route.startsWith('/api/admin/member-c/')&&!/^\/api\/admin\/member-program\/artworks(?:\/[1-9]\d*\/(?:image|feedback))?$/.test(route))return res.status(403).json({message:'Akses pengajar tidak diizinkan'});
   }
   req.admin = { email: session.email, role:owner?'owner':'teacher' };
   next();
@@ -153,6 +154,7 @@ app.use('/api/admin/member', requireAdmin, express.json({limit:'14mb'}), createM
   audit: (req, action, entityType, entityId, details = {}) => db.logAdminAction({ adminEmail: req.admin.email, action: `member_${action}`, entityType: `member_${entityType}`, entityId, details }),
 }));
 app.use('/api/admin/member-program',requireAdmin,express.json({limit:'14mb'}),createPhase7AdminRouter({pool,artworkDir:path.join(memberPrivateDir,'artworks'),audit:(req,action,entityType,entityId,details={})=>db.logAdminAction({adminEmail:req.admin.email,action:`member_${action}`,entityType:`member_${entityType}`,entityId,details})}));
+app.use('/api/admin/member-c',requireAdmin,express.json({limit:'1mb'}),createMilestoneCRouter({pool}));
 
 const parseMetadata = (metadata) => {
   if (!metadata) return {};
@@ -1484,6 +1486,12 @@ app.post('/api/admin/access-codes/:code/restore', requireAdmin, async (req, res)
     console.error('Restore code error:', error);
     res.status(500).json({ message: 'Failed to restore code', error: error.message });
   }
+});
+
+app.use((error,req,res,next)=>{
+  recordOperationalEvent(pool,{kind:'http_error',source:req.path,message:error.message,details:{method:req.method,status:error.status||500,code:error.code}}).catch(e=>console.error('operational_event_failed',e.code));
+  if(res.headersSent)return next(error);
+  res.status(error.status||500).json({message:error.status&&error.status<500?error.message:'Internal server error'});
 });
 
 // Initialize database and start server

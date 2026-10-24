@@ -1,0 +1,16 @@
+BEGIN;
+CREATE TABLE IF NOT EXISTS member_notification_preferences(member_id bigint PRIMARY KEY REFERENCES member_accounts(id) ON DELETE CASCADE,in_app boolean NOT NULL DEFAULT true,email boolean NOT NULL DEFAULT false,whatsapp boolean NOT NULL DEFAULT false,updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS member_message_templates(id bigserial PRIMARY KEY,key text NOT NULL UNIQUE,title text NOT NULL,body text NOT NULL,channels text[] NOT NULL DEFAULT '{in_app}',enabled boolean NOT NULL DEFAULT true,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),CHECK(key~'^[a-z0-9_-]{2,50}$'),CHECK(channels<@ARRAY['in_app','email','whatsapp']::text[]));
+CREATE TABLE IF NOT EXISTS member_delivery_queue(id bigserial PRIMARY KEY,member_id bigint NOT NULL REFERENCES member_accounts(id) ON DELETE CASCADE,template_id bigint REFERENCES member_message_templates(id) ON DELETE SET NULL,channel text NOT NULL CHECK(channel IN('in_app','email','whatsapp')),title text NOT NULL,body text NOT NULL,href text NOT NULL DEFAULT '',scheduled_at timestamptz NOT NULL DEFAULT now(),status text NOT NULL DEFAULT 'queued' CHECK(status IN('queued','processing','sent','retry','suppressed','failed')),attempts integer NOT NULL DEFAULT 0,next_attempt_at timestamptz NOT NULL DEFAULT now(),last_error text,created_at timestamptz NOT NULL DEFAULT now(),sent_at timestamptz);
+CREATE INDEX IF NOT EXISTS member_delivery_queue_due ON member_delivery_queue(next_attempt_at,id) WHERE status IN('queued','retry');
+CREATE TABLE IF NOT EXISTS member_question_bank(id bigserial PRIMARY KEY,course_id bigint NOT NULL REFERENCES member_courses(id) ON DELETE CASCADE,kind text NOT NULL CHECK(kind IN('multiple_choice','true_false')),prompt text NOT NULL,options jsonb NOT NULL,correct_answer text NOT NULL,explanation text NOT NULL DEFAULT '',enabled boolean NOT NULL DEFAULT true,created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS member_quiz_bank_questions(quiz_id bigint NOT NULL REFERENCES member_quizzes(id) ON DELETE CASCADE,question_id bigint NOT NULL REFERENCES member_question_bank(id) ON DELETE CASCADE,PRIMARY KEY(quiz_id,question_id));
+ALTER TABLE member_quizzes ADD COLUMN IF NOT EXISTS question_count integer NOT NULL DEFAULT 0 CHECK(question_count BETWEEN 0 AND 100);
+ALTER TABLE member_quizzes ADD COLUMN IF NOT EXISTS randomize boolean NOT NULL DEFAULT false;
+ALTER TABLE member_quiz_attempts ADD COLUMN IF NOT EXISTS question_ids jsonb NOT NULL DEFAULT '[]';
+CREATE TABLE IF NOT EXISTS member_rubrics(id bigserial PRIMARY KEY,course_id bigint NOT NULL REFERENCES member_courses(id) ON DELETE CASCADE,title text NOT NULL,criteria jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+ALTER TABLE member_lessons ADD COLUMN IF NOT EXISTS assignment_due_at timestamptz;
+ALTER TABLE member_lessons ADD COLUMN IF NOT EXISTS assignment_late_policy text NOT NULL DEFAULT 'allow' CHECK(assignment_late_policy IN('allow','mark_late','reject'));
+ALTER TABLE member_lessons ADD COLUMN IF NOT EXISTS assignment_rubric_id bigint REFERENCES member_rubrics(id) ON DELETE SET NULL;
+ALTER TABLE member_lessons ADD COLUMN IF NOT EXISTS artwork_revision_limit integer NOT NULL DEFAULT 1 CHECK(artwork_revision_limit BETWEEN 0 AND 20);
+COMMIT;
