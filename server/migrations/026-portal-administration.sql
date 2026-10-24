@@ -1,6 +1,6 @@
 BEGIN;
 ALTER TABLE member_certificates ADD COLUMN IF NOT EXISTS verification_code text UNIQUE;
-UPDATE member_certificates SET verification_code=encode(gen_random_bytes(18),'hex') WHERE verification_code IS NULL;
+UPDATE member_certificates SET verification_code=md5(id::text||issued_at::text||member_id::text||course_id::text) WHERE verification_code IS NULL;
 ALTER TABLE member_certificates ALTER COLUMN verification_code SET NOT NULL;
 ALTER TABLE member_certificates ADD COLUMN IF NOT EXISTS artifact_digest text;
 ALTER TABLE member_certificates ADD COLUMN IF NOT EXISTS artifact_signature text;
