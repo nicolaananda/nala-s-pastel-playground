@@ -7,6 +7,7 @@ import { db, initDatabase, pool } from './db.js';
 import { createAdminSessionStore } from './admin-session-store.js';
 import { createMemberStore } from './member-db.js';
 import {adminLoginLimit} from './admin-login-limit.js';
+import {createUnifiedAuthRouter} from './unified-auth.js';
 import { parseCookies as parseCookieHeader, verifySignedJson, verifyPassword, validPassword } from './member-auth.js';
 import { createMemberRouter, memberNotification, memberPaymentParameters } from './member-routes.js';
 import { createMemberAdminRouter } from './member-admin.js';
@@ -117,6 +118,8 @@ const setAdminCookie = (res, token) => {
     path: '/',
   });
 };
+const issueAdminSession=async email=>{const expiresAt=Date.now()+ADMIN_SESSION_TTL_MS,token=signSession({email,expiresAt,nonce:crypto.randomUUID()});await adminSessions.issue(token,email,expiresAt);return token};
+app.use('/api/auth',createUnifiedAuthRouter({pool,memberStore,adminEmail,verifyOwnerPassword:isAdminPasswordValid,issueAdminSession,setAdminCookie,allowedOrigins,production:process.env.NODE_ENV==='production'}));
 
 const requireAdmin = async (req, res, next) => {
  try {
@@ -141,6 +144,7 @@ const adminBoundary=(req,res,next)=>{res.set('Cache-Control','private, no-store'
 app.use('/api/admin',adminBoundary);
 app.use('/api/admin/member', requireAdmin, express.json({limit:'14mb'}), createMemberAdminRouter({
   pool,
+  ownerEmail: adminEmail,
   privateDir: memberPrivateDir,
   allowedOrigins,
   providerStatus: orderId => snap.transaction.status(orderId),
@@ -435,9 +439,7 @@ app.post('/api/admin/login', adminLoginLimit(), async (req, res) => {
     if (!(email===adminEmail?isAdminPasswordValid(password):teacher&&await verifyPassword(password,teacher.password_hash))) {
       return res.status(401).json({ message: 'Email atau password admin salah' });
     }
-    const expiresAt=Date.now()+ADMIN_SESSION_TTL_MS;
-    const token = signSession({ email, expiresAt, nonce:crypto.randomUUID() });
-    await adminSessions.issue(token,email,expiresAt);
+    const token = await issueAdminSession(email);
     setAdminCookie(res, token);
     await db.logAdminAction({ adminEmail: email, action: 'login', entityType: 'admin_session', details: { email } });
     res.json({ admin: { email } });
@@ -1489,9 +1491,10 @@ app.post('/api/admin/access-codes/:code/restore', requireAdmin, async (req, res)
 });
 
 app.use((error,req,res,next)=>{
-  recordOperationalEvent(pool,{kind:'http_error',source:req.path,message:error.message,details:{method:req.method,status:error.status||500,code:error.code}}).catch(e=>console.error('operational_event_failed',e.code));
+  const status=error.message==='CORS origin not allowed'?403:error.status||500;
+  recordOperationalEvent(pool,{kind:'http_error',source:req.path,message:error.message,details:{method:req.method,status,code:error.code}}).catch(e=>console.error('operational_event_failed',e.code));
   if(res.headersSent)return next(error);
-  res.status(error.status||500).json({message:error.status&&error.status<500?error.message:'Internal server error'});
+  res.status(status).json({message:status===403?'Origin tidak diizinkan':status<500?error.message:'Internal server error'});
 });
 
 // Initialize database and start server
