@@ -21,7 +21,7 @@ const providerTime=value=>{
 };
 const providerTimestamp=date=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(date).replace('T',' ')+' +0700';
 export const memberPaymentParameters=({orderId,amount,email,name,createdAt=new Date()})=>({transaction_details:{order_id:orderId,gross_amount:amount},item_details:[{id:'membership',price:amount,quantity:1,name:'Membership Nala'}],customer_details:{email,first_name:name},enabled_payments:['qris','other_qris'],expiry:{start_time:providerTimestamp(createdAt),duration:30,unit:'minute'},page_expiry:{duration:30,unit:'minute'}});
-export const memberNotification=async({store,serverKey,notification,resolveProviderStatus})=>{
+export const memberNotification=async({store,serverKey,notification,resolveProviderStatus,notifyPaid=async()=>{}})=>{
  if(!serverKey)return {status:503,body:{message:'Payment verification unavailable'}};
  const expected=crypto.createHash('sha512').update(`${notification.order_id||''}${notification.status_code||''}${notification.gross_amount||''}${serverKey||''}`).digest();
  let supplied;try{supplied=Buffer.from(String(notification.signature_key||''),'hex')}catch{return {status:403,body:{message:'Invalid signature'}}}
@@ -35,6 +35,7 @@ export const memberNotification=async({store,serverKey,notification,resolveProvi
  const paidAt=providerTime(verified.settlement_time);
  if(state!=='settlement'||verified.payment_type!=='qris'||String(verified.status_code)!=='200'||!paidAt)return {status:200,body:{status:'ignored'}};
  const result=await settleMemberOrder(store,{orderId:verified.order_id,amount:Number(verified.gross_amount),transactionId:verified.transaction_id,paymentType:verified.payment_type,paidAt});
+ if(result.applied)try{await notifyPaid(result.notification)}catch(error){console.error('Member Telegram notification failed:',error.message)}
  return {status:['mismatch','transaction'].includes(result.reason)?400:200,body:result};
 };
 export const createMemberRouter=({store,sendMail=async()=>{},createPayment,reconcileOrder,cancelPayment,checkoutEnabled=false,clientKey='',snapUrl='',production=false,privateDir,artworkDir=path.join(privateDir,'artworks'),allowedOrigins=[],now=()=>new Date()})=>{
