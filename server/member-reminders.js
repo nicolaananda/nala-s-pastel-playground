@@ -1,7 +1,7 @@
 const safeError=e=>String(e?.code||e?.name||'delivery_failed').slice(0,100);
 export async function enqueueMemberReminders(pool,now=new Date()){
- const rows=(await pool.query(`SELECT id,membership_expires_at FROM member_accounts WHERE renewal_emails_enabled AND suspended_at IS NULL AND membership_expires_at BETWEEN $1::timestamptz-interval '1 day' AND $1::timestamptz+interval '4 days'`,[now])).rows;
- for(const x of rows){const hours=(new Date(x.membership_expires_at)-now)/3600000,key=hours>48?'h3':hours>0?'h1':'expired';await pool.query('INSERT INTO member_reminder_outbox(member_id,reminder_key,entitlement_expires_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[x.id,key,x.membership_expires_at])}
+ const rows=(await pool.query(`SELECT id,membership_expires_at,CASE WHEN membership_expires_at>$1::timestamptz+interval '6 days' THEN 'h7' WHEN membership_expires_at>$1::timestamptz+interval '2 days' THEN 'h3' WHEN membership_expires_at>$1::timestamptz THEN 'h1' ELSE 'expired' END reminder_key FROM member_accounts WHERE renewal_emails_enabled AND suspended_at IS NULL AND (membership_expires_at BETWEEN $1::timestamptz-interval '1 day' AND $1::timestamptz OR membership_expires_at>$1::timestamptz AND membership_expires_at<=$1::timestamptz+interval '1 day' OR membership_expires_at>$1::timestamptz+interval '2 days' AND membership_expires_at<=$1::timestamptz+interval '3 days' OR membership_expires_at>$1::timestamptz+interval '6 days' AND membership_expires_at<=$1::timestamptz+interval '7 days')`,[now])).rows;
+ for(const x of rows)await pool.query('INSERT INTO member_reminder_outbox(member_id,reminder_key,entitlement_expires_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[x.id,x.reminder_key,x.membership_expires_at])
  return rows.length;
 }
 export async function deliverMemberReminders(pool,sendMail,{limit=25,leaseMinutes=10}={}){
