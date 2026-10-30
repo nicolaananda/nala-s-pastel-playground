@@ -12,6 +12,7 @@ import { parseCookies as parseCookieHeader, verifySignedJson, verifyPassword, va
 import { createMemberRouter, memberNotification, memberPaymentParameters } from './member-routes.js';
 import { sendMemberPaymentTelegram } from './member-telegram.js';
 import { createMemberAdminRouter } from './member-admin.js';
+import { createRewardAdminRouter } from './member-rewards.js';
 import { createPhase7AdminRouter } from './member-phase7-admin.js';
 import { createPhase7PublicRouter } from './member-phase7.js';
 import { createMilestoneCRouter, recordOperationalEvent } from './member-milestone-c.js';
@@ -144,6 +145,7 @@ const requireAdmin = async (req, res, next) => {
 
 const adminBoundary=(req,res,next)=>{res.set('Cache-Control','private, no-store');if(!['GET','HEAD','OPTIONS'].includes(req.method)&&(!req.headers.origin||!allowedOrigins.includes(req.headers.origin)))return res.status(403).json({message:'Origin tidak diizinkan'});next()};
 app.use('/api/admin',adminBoundary);
+app.use('/api/admin/member-rewards',requireAdmin,express.json({limit:'1mb'}),createRewardAdminRouter({pool}));
 app.use('/api/admin/member', requireAdmin, express.json({limit:'14mb'}), createMemberAdminRouter({
   pool,
   ownerEmail: adminEmail,
