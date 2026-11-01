@@ -73,7 +73,8 @@ export const memberMailer = async ({to,purpose,token,reminderKey,expiresAt}) => 
   await transporter.sendMail({from:process.env.SMTP_FROM,to,subject:renewal?'Pengingat masa aktif member Nala':purpose==='verify'?'Verifikasi akun Nala':'Reset password Nala',text:renewal?`Masa aktif member Nala ${reminderKey==='expired'?'telah berakhir':'akan berakhir'} pada ${new Date(expiresAt).toISOString()}. Perpanjang melalui ${base}/portal.`:`Buka ${base}/${route}?token=${encodeURIComponent(token)}. Tautan ini hanya dapat digunakan sekali.`});
 };
 const memberPaymentNotifier=details=>sendMemberPaymentTelegram(details);
-const reconcileMemberOrder=async orderId=>{const verified=await snap.transaction.status(orderId),statusCode=String(verified.status_code||''),amount=String(verified.gross_amount||''),signature=crypto.createHash('sha512').update(`${orderId}${statusCode}${amount}${process.env.MIDTRANS_SERVER_KEY||''}`).digest('hex');return memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification:{order_id:orderId,status_code:statusCode,gross_amount:amount,signature_key:signature},resolveProviderStatus:async()=>verified,notifyPaid:memberPaymentNotifier})};
+const memberPaymentFailureNotifier=details=>recordOperationalEvent(pool,{kind:details.kind,source:'midtrans',message:`Member payment incident: ${details.orderId||'unknown'}`,details});
+const reconcileMemberOrder=async orderId=>{const verified=await snap.transaction.status(orderId),statusCode=String(verified.status_code||''),amount=String(verified.gross_amount||''),signature=crypto.createHash('sha512').update(`${orderId}${statusCode}${amount}${process.env.MIDTRANS_SERVER_KEY||''}`).digest('hex');return memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification:{order_id:orderId,status_code:statusCode,gross_amount:amount,signature_key:signature},resolveProviderStatus:async()=>verified,notifyPaid:memberPaymentNotifier,notifyFailure:memberPaymentFailureNotifier})};
 const cancelMemberSnap=async token=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000),host=process.env.MIDTRANS_IS_PRODUCTION==='true'?'https://app.midtrans.com':'https://app.sandbox.midtrans.com';try{const response=await fetch(`${host}/snap/v1/transactions/${encodeURIComponent(token)}/cancel`,{method:'POST',headers:{Authorization:`Basic ${Buffer.from(`${process.env.MIDTRANS_SERVER_KEY||''}:`).toString('base64')}`,Accept:'application/json','Content-Type':'application/json'},signal:controller.signal}),body=await response.json().catch(()=>null);if(!response.ok||!body?.canceled_at)throw Object.assign(Error('Snap cancellation failed'),{httpStatusCode:response.status});return body}finally{clearTimeout(timer)}};
 app.use('/api/member',createMemberRouter({store:memberStore,sendMail:memberMailer,checkoutEnabled:process.env.MEMBER_CHECKOUT_ENABLED==='true',clientKey:process.env.MIDTRANS_CLIENT_KEY,snapUrl:process.env.MIDTRANS_IS_PRODUCTION==='true'?'https://app.midtrans.com/snap/snap.js':'https://app.sandbox.midtrans.com/snap/snap.js',production:process.env.NODE_ENV==='production',privateDir:memberPrivateDir,allowedOrigins,reconcileOrder:reconcileMemberOrder,cancelPayment:cancelMemberSnap,createPayment:async input=>{const transaction=await snap.createTransaction(memberPaymentParameters(input));return {token:transaction.token,redirectUrl:transaction.redirect_url}}}));
 app.use('/api/member-public',createPhase7PublicRouter({pool,artworkDir:path.join(memberPrivateDir,'artworks')}));
@@ -157,7 +158,7 @@ app.use('/api/admin/member', requireAdmin, express.json({limit:'14mb'}), createM
   reconcileOrder: async orderId => {
     const verified=await snap.transaction.status(orderId),statusCode=String(verified.status_code||''),amount=String(verified.gross_amount||'');
     const signature=crypto.createHash('sha512').update(`${orderId}${statusCode}${amount}${process.env.MIDTRANS_SERVER_KEY||''}`).digest('hex');
-    return memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification:{order_id:orderId,status_code:statusCode,gross_amount:amount,signature_key:signature},resolveProviderStatus:async()=>verified,notifyPaid:memberPaymentNotifier});
+    return memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification:{order_id:orderId,status_code:statusCode,gross_amount:amount,signature_key:signature},resolveProviderStatus:async()=>verified,notifyPaid:memberPaymentNotifier,notifyFailure:memberPaymentFailureNotifier});
   },
   audit: (req, action, entityType, entityId, details = {}) => db.logAdminAction({ adminEmail: req.admin.email, action: `member_${action}`, entityType: `member_${entityType}`, entityId, details }),
 }));
@@ -999,7 +1000,7 @@ app.post('/api/midtrans/notification', async (req, res) => {
     console.log(`Received notification for order ${orderId}: ${transactionStatus}`);
 
     if (orderId?.startsWith('MEMBER-')) {
-      const result=await memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification,resolveProviderStatus:orderId=>snap.transaction.status(orderId),notifyPaid:memberPaymentNotifier});
+      const result=await memberNotification({store:memberStore,serverKey:process.env.MIDTRANS_SERVER_KEY,notification,resolveProviderStatus:orderId=>snap.transaction.status(orderId),notifyPaid:memberPaymentNotifier,notifyFailure:memberPaymentFailureNotifier});
       return res.status(result.status).json(result.body);
     }
 

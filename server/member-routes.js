@@ -22,7 +22,7 @@ const providerTime=value=>{
 };
 const providerTimestamp=date=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).format(date).replace('T',' ')+' +0700';
 export const memberPaymentParameters=({orderId,amount,email,name,createdAt=new Date()})=>({transaction_details:{order_id:orderId,gross_amount:amount},item_details:[{id:'membership',price:amount,quantity:1,name:'Membership Nala'}],customer_details:{email,first_name:name},enabled_payments:['qris','other_qris'],expiry:{start_time:providerTimestamp(createdAt),duration:30,unit:'minute'},page_expiry:{duration:30,unit:'minute'}});
-export const memberNotification=async({store,serverKey,notification,resolveProviderStatus,notifyPaid=async()=>{}})=>{
+export const memberNotification=async({store,serverKey,notification,resolveProviderStatus,notifyPaid=async()=>{},notifyFailure=async()=>{}})=>{
  if(!serverKey)return {status:503,body:{message:'Payment verification unavailable'}};
  const expected=crypto.createHash('sha512').update(`${notification.order_id||''}${notification.status_code||''}${notification.gross_amount||''}${serverKey||''}`).digest();
  let supplied;try{supplied=Buffer.from(String(notification.signature_key||''),'hex')}catch{return {status:403,body:{message:'Invalid signature'}}}
@@ -30,13 +30,14 @@ export const memberNotification=async({store,serverKey,notification,resolveProvi
  if(!String(notification.order_id||'').startsWith('MEMBER-'))return null;
  if(typeof resolveProviderStatus!=='function')return {status:503,body:{message:'Payment verification unavailable'}};
  let verified;try{verified=await resolveProviderStatus(notification.order_id)}catch{return {status:503,body:{message:'Payment verification unavailable'}}}
- if(!verified||verified.order_id!==notification.order_id)return {status:400,body:{message:'Payment mismatch'}};
+ if(!verified||verified.order_id!==notification.order_id){await notifyFailure({kind:'payment_verification_mismatch',orderId:notification.order_id});return {status:400,body:{message:'Payment mismatch'}}}
  const state=String(verified.transaction_status||'');
  if(['pending','expire','cancel','deny'].includes(state)){await store.setOrderState(verified.order_id,{expire:'expired',cancel:'cancelled',deny:'denied'}[state]||state);return {status:200,body:{status:'updated'}}}
  const paidAt=providerTime(verified.settlement_time);
- if(state!=='settlement'||verified.payment_type!=='qris'||String(verified.status_code)!=='200'||!paidAt)return {status:200,body:{status:'ignored'}};
+ if(state!=='settlement'||verified.payment_type!=='qris'||String(verified.status_code)!=='200'||!paidAt){await notifyFailure({kind:'payment_settlement_ignored',orderId:verified.order_id,state,paymentType:verified.payment_type,statusCode:String(verified.status_code||'')});return {status:200,body:{status:'ignored'}}}
  const result=await settleMemberOrder(store,{orderId:verified.order_id,amount:Number(verified.gross_amount),transactionId:verified.transaction_id,paymentType:verified.payment_type,paidAt});
  if(result.applied)try{await notifyPaid(result.notification)}catch(error){console.error('Member Telegram notification failed:',error.message)}
+ else if(!['duplicate'].includes(result.reason))await notifyFailure({kind:'payment_entitlement_failed',orderId:verified.order_id,reason:result.reason||'unknown'});
  return {status:['mismatch','transaction'].includes(result.reason)?400:200,body:result};
 };
 export const createMemberRouter=({store,sendMail=async()=>{},createPayment,reconcileOrder,cancelPayment,checkoutEnabled=false,clientKey='',snapUrl='',production=false,privateDir,artworkDir=path.join(privateDir,'artworks'),allowedOrigins=[],now=()=>new Date()})=>{
