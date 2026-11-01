@@ -2,7 +2,7 @@ const escapeHtml=value=>String(value??'-').replace(/&/g,'&amp;').replace(/</g,'&
 const rupiah=value=>Number(value).toLocaleString('id-ID');
 const jakarta=value=>new Intl.DateTimeFormat('id-ID',{timeZone:'Asia/Jakarta',dateStyle:'long',timeStyle:'short'}).format(new Date(value)).replace(' pukul ', ' pukul ');
 
-export const memberPaymentMessage=({orderId,amount,paymentType='qris',paidAt,name,email,planName,durationDays,expiresAt,accessMode})=>[
+export const memberPaymentMessage=({orderId,amount,paymentType='qris',paidAt,name,email,planName,durationDays,expiresAt,accessMode,courses=[]})=>[
   '🎉 <b>MEMBER BERHASIL BERLANGGANAN</b>',
   '🎨 Nala Member',
   '',
@@ -20,6 +20,7 @@ export const memberPaymentMessage=({orderId,amount,paymentType='qris',paidAt,nam
   '',
   '<b>📅 Akses</b>',
   `• Jenis: ${accessMode==='selected'?'Kelas terpilih':'Semua kelas'}`,
+  ...(accessMode==='selected'?[`• Kelas: ${courses.length?courses.map(({title})=>escapeHtml(title)).join(', '):'-'}`]:[]),
   `• Aktif sampai: ${jakarta(expiresAt)}`,
   '',
   `🕒 <i>${jakarta(paidAt)} WIB</i>`,

@@ -33,14 +33,15 @@ export const settleMemberOrder=(store,{orderId,amount,transactionId,paymentType,
   const used=await client.query('SELECT order_id FROM member_orders WHERE provider_transaction_id=$1 AND order_id<>$2 FOR UPDATE',[transactionId,orderId]);
   if(used.rowCount)return {applied:false,reason:'transaction'};
   const account=(await client.query('SELECT name,email,membership_expires_at FROM member_accounts WHERE id=$1 FOR UPDATE',[order.member_id])).rows[0];
-  let updated=account,courseGrants=[];
+  let updated=account,courseGrants=[],courses=[];
   if(order.access_mode==='selected'){
-    const snapshot=await client.query('SELECT course_id FROM member_order_courses WHERE order_id=$1 ORDER BY course_id FOR UPDATE',[order.id]);
+    const snapshot=await client.query('SELECT oc.course_id,c.title FROM member_order_courses oc JOIN member_courses c ON c.id=oc.course_id WHERE oc.order_id=$1 ORDER BY oc.course_id FOR UPDATE OF oc',[order.id]);
+    courses=snapshot.rows.map(({course_id,title})=>({id:course_id,title}));
     if(!snapshot.rowCount)return {applied:false,reason:'snapshot'};
     for(const {course_id} of snapshot.rows){await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1||':'||$2,0))",[order.member_id,course_id]);const prior=(await client.query('SELECT max(expires_at) expires_at FROM member_course_grants WHERE member_id=$1 AND course_id=$2 AND revoked_at IS NULL',[order.member_id,course_id])).rows[0]?.expires_at;const start=prior&&prior>paidAt?prior:paidAt;courseGrants.push((await client.query("INSERT INTO member_course_grants(member_id,course_id,source_order_id,starts_at,expires_at) VALUES($1,$2,$3,$4::timestamptz,$4::timestamptz+($5||' days')::interval) RETURNING course_id AS \"courseId\",expires_at AS \"expiresAt\"",[order.member_id,course_id,order.id,start,order.duration_days])).rows[0])}
   }else updated=(await client.query("UPDATE member_accounts SET membership_expires_at=GREATEST(COALESCE(membership_expires_at,$2),$2)+($3||' days')::interval,updated_at=now() WHERE id=$1 RETURNING membership_expires_at",[order.member_id,paidAt,order.duration_days])).rows[0];
   await client.query("UPDATE member_orders SET status='paid',provider_transaction_id=$2,payment_type=$3,paid_at=$4,fulfilled_at=now(),updated_at=now() WHERE id=$1",[order.id,transactionId,paymentType,paidAt]);
   try{await client.query("INSERT INTO member_access_ledger(member_id,source_type,source_id,days_delta,previous_expires_at,resulting_expires_at,actor) VALUES($1,'payment',$2,$3,$4,$5,'provider') ON CONFLICT DO NOTHING",[order.member_id,order.order_id,order.duration_days,account?.membership_expires_at||null,updated?.membership_expires_at||account?.membership_expires_at||null])}catch(e){if(e.code!=='42P01')throw e}
   const expiresAt=order.access_mode==='selected'?courseGrants.reduce((latest,grant)=>!latest||grant.expiresAt>latest?grant.expiresAt:latest,null):updated.membership_expires_at;
-  return {applied:true,accessMode:order.access_mode,courseGrants,expiresAt,notification:{orderId:order.order_id,amount:order.amount,paymentType,paidAt,name:account?.name||'-',email:account?.email||'-',planName:order.plan_name||'Membership Nala',durationDays:order.duration_days,expiresAt,accessMode:order.access_mode}};
+  return {applied:true,accessMode:order.access_mode,courseGrants,expiresAt,notification:{orderId:order.order_id,amount:order.amount,paymentType,paidAt,name:account?.name||'-',email:account?.email||'-',planName:order.plan_name||'Membership Nala',durationDays:order.duration_days,expiresAt,accessMode:order.access_mode,courses}};
 });
