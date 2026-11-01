@@ -4,9 +4,11 @@ import {memberPaymentMessage,sendMemberPaymentTelegram} from './member-telegram.
 
 const details={orderId:'MEMBER-123',amount:50000,paymentType:'qris',paidAt:'2026-10-27T04:46:00Z',name:'Zhyla <Admin>',email:'zhyla&mail@example.com',planName:'Paket 30 Hari',durationDays:30,expiresAt:'2026-11-26T04:46:00Z',accessMode:'legacy_all'};
 
-test('lists selected course titles safely',()=>{
+test('lists selected course titles safely without ambiguous access type',()=>{
  const message=memberPaymentMessage({...details,accessMode:'selected',courses:[{title:'Melukis & Menggambar <Dasar>'}]});
  assert.match(message,/Kelas: Melukis &amp; Menggambar &lt;Dasar&gt;/);
+ assert.doesNotMatch(message,/Jenis:/);
+ assert.match(memberPaymentMessage(details),/Kelas: Semua kelas/);
 });
 
 test('formats and escapes member payment notification',()=>{
