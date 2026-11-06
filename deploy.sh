@@ -13,6 +13,7 @@ cd "$PROJECT_DIR"
 npm run build
 
 test -f dist/index.html
+printf '%s\n' "$RELEASE_ID" > dist/release.txt
 mkdir -p "$RELEASES_DIR"
 cp -a dist "$RELEASE_DIR"
 chown -R www-data:www-data "$RELEASE_DIR"
@@ -33,7 +34,17 @@ fi
 
 ln -sfn "$RELEASE_DIR" "$WEB_ROOT/public_html.next"
 mv -Tf "$WEB_ROOT/public_html.next" "$CURRENT_LINK"
-curl -fsS "https://artstudionala.com/?release=$RELEASE_ID" >/dev/null
+
+[[ "$(readlink -f "$CURRENT_LINK")" == "$RELEASE_DIR" ]]
+verified=false
+for attempt in 1 2 3 4 5; do
+  if [[ "$(curl -fsS --max-time 10 "https://artstudionala.com/release.txt?release=$RELEASE_ID" 2>/dev/null)" == "$RELEASE_ID" ]]; then
+    verified=true
+    break
+  fi
+  sleep "$attempt"
+done
+[[ "$verified" == true ]]
 
 trap - ERR
 find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | tail -n +6 | cut -d' ' -f2- | xargs -r rm -rf

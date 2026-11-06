@@ -49,6 +49,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
   const [shippingOptions, setShippingOptions] = useState<ShippingCost[]>([]);
   const [selectedShippingCost, setSelectedShippingCost] = useState<number>(0);
   const [isLoadingShipping, setIsLoadingShipping] = useState(false);
+  const [shippingError, setShippingError] = useState("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const {
@@ -59,7 +60,14 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
     setValue,
   } = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
+    defaultValues: (() => { try { return JSON.parse(sessionStorage.getItem(`checkout-draft:${bookId}`) || "null")?.fields; } catch { return undefined; } })(),
   });
+
+  useEffect(() => {
+    try { const draft = JSON.parse(sessionStorage.getItem(`checkout-draft:${bookId}`) || "null"); if (draft?.village) setVillage(draft.village); } catch { /* Storage may be unavailable. */ }
+    const subscription = watch((fields) => { try { sessionStorage.setItem(`checkout-draft:${bookId}`, JSON.stringify({ fields, village })); } catch { /* Storage may be unavailable. */ } });
+    return () => subscription.unsubscribe();
+  }, [bookId, village, watch]);
 
   // Hitung ongkir saat village berubah
   useEffect(() => {
@@ -74,6 +82,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
     let cancelled = false;
     const fetchShipping = async () => {
       setIsLoadingShipping(true);
+      setShippingError("");
       try {
         const response = await calculateShippingCost(village.code, DEFAULT_BOOK_WEIGHT);
         if (cancelled) return;
@@ -87,6 +96,11 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
         }
       } catch (error) {
         console.error("Shipping calculation error:", error);
+        if (!cancelled) {
+          setShippingOptions([]);
+          setSelectedShippingCost(0);
+          setShippingError("Ongkir gagal dimuat. Pilih ulang kelurahan/desa atau coba lagi.");
+        }
       } finally {
         if (!cancelled) setIsLoadingShipping(false);
       }
@@ -130,6 +144,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
       };
 
       const paymentResponse = await createMidtransPaymentLink(paymentRequest);
+      sessionStorage.removeItem(`checkout-draft:${bookId}`);
 
       toast.success("Payment link berhasil dibuat!");
 
@@ -163,15 +178,15 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="firstName">Nama Depan *</Label>
-                <Input id="firstName" {...register("firstName")} placeholder="Nama depan" />
+                <Input id="firstName" autoComplete="given-name" aria-invalid={!!errors.firstName} aria-describedby={errors.firstName ? "firstName-error" : undefined} {...register("firstName")} placeholder="Nama depan" />
                 {errors.firstName && (
-                  <p className="text-sm text-destructive mt-1">{errors.firstName.message}</p>
+                  <p id="firstName-error" role="alert" className="text-sm text-destructive mt-1">{errors.firstName.message}</p>
                 )}
               </div>
 
               <div>
                 <Label htmlFor="lastName">Nama Belakang *</Label>
-                <Input id="lastName" {...register("lastName")} placeholder="Nama belakang" />
+                <Input id="lastName" autoComplete="family-name" aria-invalid={!!errors.lastName} {...register("lastName")} placeholder="Nama belakang" />
                 {errors.lastName && (
                   <p className="text-sm text-destructive mt-1">{errors.lastName.message}</p>
                 )}
@@ -180,7 +195,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
 
             <div>
               <Label htmlFor="email">Email *</Label>
-              <Input id="email" type="email" {...register("email")} placeholder="email@example.com" />
+              <Input id="email" type="email" autoComplete="email" aria-invalid={!!errors.email} {...register("email")} placeholder="email@example.com" />
               {errors.email && (
                 <p className="text-sm text-destructive mt-1">{errors.email.message}</p>
               )}
@@ -188,7 +203,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
 
             <div>
               <Label htmlFor="phone">Nomor Telepon *</Label>
-              <Input id="phone" type="tel" {...register("phone")} placeholder="081234567890" />
+              <Input id="phone" type="tel" autoComplete="tel" inputMode="tel" aria-invalid={!!errors.phone} {...register("phone")} placeholder="081234567890" />
               {errors.phone && (
                 <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>
               )}
@@ -203,6 +218,8 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
               <Label htmlFor="address">Alamat Lengkap *</Label>
               <Textarea
                 id="address"
+                autoComplete="street-address"
+                aria-invalid={!!errors.address}
                 {...register("address")}
                 placeholder="Jl. Contoh No. 123, RT/RW"
                 rows={3}
@@ -224,7 +241,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
 
             <div>
               <Label htmlFor="postalCode">Kode Pos *</Label>
-              <Input id="postalCode" {...register("postalCode")} placeholder="12345" />
+              <Input id="postalCode" autoComplete="postal-code" inputMode="numeric" aria-invalid={!!errors.postalCode} {...register("postalCode")} placeholder="12345" />
               {errors.postalCode && (
                 <p className="text-sm text-destructive mt-1">{errors.postalCode.message}</p>
               )}
@@ -232,16 +249,18 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
           </div>
 
           {/* Shipping Options */}
-          <div className="space-y-4">
+          <div className="space-y-4" aria-live="polite" aria-busy={isLoadingShipping}>
             <h3 className="text-lg font-semibold text-primary">Pilihan Pengiriman</h3>
 
-            {!village ? (
+            {shippingError ? (
+              <p role="alert" className="text-sm text-destructive">{shippingError}</p>
+            ) : !village ? (
               <p className="text-sm text-muted-foreground">
                 Pilih kelurahan/desa tujuan dulu untuk melihat opsi pengiriman
               </p>
             ) : isLoadingShipping ? (
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
                 <span>Menghitung ongkir...</span>
               </div>
             ) : shippingOptions.length > 0 ? (
@@ -301,7 +320,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
           >
             {isProcessingPayment ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
                 Memproses...
               </>
             ) : (

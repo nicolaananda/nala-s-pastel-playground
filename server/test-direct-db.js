@@ -1,4 +1,7 @@
-import { db, initDatabase } from './db.js';
+if (process.env.ALLOW_DB_WRITE_TESTS !== 'true') {
+  throw new Error('Refusing DB write test: set ALLOW_DB_WRITE_TESTS=true');
+}
+const { db, initDatabase } = await import('./db.js');
 
 // Test direct database insertion (simulate webhook)
 const testDirectInsert = async () => {

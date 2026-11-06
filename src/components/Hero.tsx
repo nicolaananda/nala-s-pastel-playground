@@ -29,7 +29,9 @@ const Hero = () => {
           alt="Background awan untuk Nala Art Studio" 
           className="absolute inset-0 w-full h-full object-cover opacity-0"
           loading="eager"
-          fetchPriority="high"
+          decoding="async"
+          width="1920"
+          height="1080"
           aria-hidden="true"
         />
         </picture>
@@ -65,6 +67,7 @@ const Hero = () => {
               className="w-64 sm:w-80 md:w-96 lg:w-[28rem] mx-auto drop-shadow-2xl animate-float"
               loading="eager"
               fetchPriority="high"
+              decoding="async"
               width="448"
               height="448"
               sizes="(max-width: 640px) 256px, (max-width: 768px) 320px, (max-width: 1024px) 384px, 448px"

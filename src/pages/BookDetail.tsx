@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -119,6 +119,8 @@ const BookDetail = () => {
   const [loading, setLoading] = useState(!book);
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<SelectedBookVideo | null>(null);
+  const [visibleVideos, setVisibleVideos] = useState(12);
+  const checkoutRef = useRef<HTMLDivElement>(null);
   const { hash } = useLocation();
 
   useEffect(() => {
@@ -132,6 +134,7 @@ const BookDetail = () => {
     setBook(initialItem ? cmsBookToView(initialItem) : null);
     setLoading(true);
     setSelectedVideo(null);
+    setVisibleVideos(12);
     setShowCheckout(false);
     fetchPublicContentItem("book", bookId)
       .then((item) => { if (active) setBook(cmsBookToView(item)); })
@@ -139,6 +142,14 @@ const BookDetail = () => {
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [bookId]);
+
+  const openCheckout = () => {
+    setShowCheckout(true);
+    requestAnimationFrame(() => {
+      checkoutRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      checkoutRef.current?.querySelector<HTMLElement>("input, button, textarea")?.focus({ preventScroll: true });
+    });
+  };
 
   if (!book) {
     return (
@@ -186,6 +197,10 @@ const BookDetail = () => {
                 src={book.image}
                 alt={book.title}
                 className="h-auto w-full object-cover"
+                width={800}
+                height={1000}
+                sizes="(max-width: 896px) calc(100vw - 64px), 768px"
+                decoding="async"
                 onError={(event) => {
                   event.currentTarget.onerror = null;
                   event.currentTarget.src = book.imageFallback;
@@ -205,7 +220,7 @@ const BookDetail = () => {
               </div>
               {!showCheckout ? (
                 <Button
-                  onClick={() => setShowCheckout(true)}
+                  onClick={openCheckout}
                   size="lg"
                   className="w-full bg-gradient-to-r from-primary via-yellow-400 to-primary bg-[length:200%_100%] px-8 py-6 text-lg hover:bg-[position:100%_0] sm:w-auto"
                 >
@@ -219,7 +234,7 @@ const BookDetail = () => {
                 <h2 id="video-buku-title" className="text-xl font-bold sm:text-2xl">Video Buku</h2>
                 <p className="mt-2 text-sm text-muted-foreground">Intip isi dan tutorial buku. Pilih video untuk membuka pemutar.</p>
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {book.videos.map((video) => (
+                  {book.videos.slice(0, visibleVideos).map((video) => (
                     <button key={video.url} type="button" aria-label={`Lihat video: ${video.title}`} aria-haspopup="dialog" className="group min-w-0 overflow-hidden rounded-xl border border-primary/20 bg-background text-left shadow-sm transition-[box-shadow,border-color] hover:border-primary/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" onClick={(event) => setSelectedVideo({ video, slug: bookId || "", bookTitle: book.title, trigger: event.currentTarget })}>
                       <span className="relative block aspect-[9/16] overflow-hidden bg-muted">
                         <img src={`https://i.ytimg.com/vi/${parseYouTubeUrl(video.url).videoId}/hqdefault.jpg`} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" width={480} height={360} className="h-full w-full object-cover" />
@@ -229,6 +244,7 @@ const BookDetail = () => {
                     </button>
                   ))}
                 </div>
+                {visibleVideos < book.videos.length && <Button type="button" variant="outline" className="mt-4" onClick={(event) => { const button = event.currentTarget; setVisibleVideos(count => Math.min(count + 12, book.videos!.length)); requestAnimationFrame(() => button.previousElementSibling?.querySelectorAll<HTMLElement>("button")[visibleVideos]?.focus()); }}>Muat 12 video lagi</Button>}
               </section>
             ) : null}
 
@@ -238,7 +254,7 @@ const BookDetail = () => {
 
         {/* Checkout Form */}
         {showCheckout && (
-          <div className="mt-8">
+          <div ref={checkoutRef} id="checkout" tabIndex={-1} className="mt-8 scroll-mt-4">
             <CheckoutForm
               bookId={bookId || ""}
               bookTitle={book.title}
@@ -253,6 +269,7 @@ const BookDetail = () => {
       
       <Footer />
       <BookVideoDialog selected={selectedVideo} onClose={() => setSelectedVideo(null)} />
+      {!showCheckout && <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 shadow-lg sm:hidden"><Button className="w-full" size="lg" onClick={openCheckout}>🛒 Beli Sekarang · Rp {book.price.toLocaleString("id-ID")}</Button></div>}
     </main>
   );
 };

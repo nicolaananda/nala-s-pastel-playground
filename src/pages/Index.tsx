@@ -1,13 +1,15 @@
+import { lazy, Suspense } from "react";
 import Hero from "@/components/Hero";
 import Seo from '@/components/Seo';
 import { HOME_TITLE, HOME_DESCRIPTION } from '../../shared/seo.js';
-import BestSellerBooks from "@/components/BestSellerBooks";
-import ArtClasses from "@/components/ArtClasses";
-import Merchandise from "@/components/Merchandise";
-import FreeWorksheet from "@/components/FreeWorksheet";
-import DigitalProducts from "@/components/DigitalProducts";
 import CompetitionPromo from "@/components/CompetitionPromo";
-import Footer from "@/components/Footer";
+
+const BestSellerBooks = lazy(() => import("@/components/BestSellerBooks"));
+const ArtClasses = lazy(() => import("@/components/ArtClasses"));
+const Merchandise = lazy(() => import("@/components/Merchandise"));
+const FreeWorksheet = lazy(() => import("@/components/FreeWorksheet"));
+const DigitalProducts = lazy(() => import("@/components/DigitalProducts"));
+const Footer = lazy(() => import("@/components/Footer"));
 
 const Index = () => {
   return (
@@ -15,12 +17,14 @@ const Index = () => {
       <Seo title={HOME_TITLE} description={HOME_DESCRIPTION} path="/" />
       <Hero />
       <CompetitionPromo />
-      <BestSellerBooks />
-      <ArtClasses />
-      <Merchandise />
-      <FreeWorksheet />
-      <DigitalProducts />
-      <Footer />
+      <Suspense fallback={null}>
+        <BestSellerBooks />
+        <ArtClasses />
+        <Merchandise />
+        <FreeWorksheet />
+        <DigitalProducts />
+        <Footer />
+      </Suspense>
     </main>
   );
 };

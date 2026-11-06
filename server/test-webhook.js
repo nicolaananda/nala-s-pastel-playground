@@ -2,10 +2,18 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 
 dotenv.config();
+if (process.env.ALLOW_WEBHOOK_WRITE_TEST !== 'true') {
+  throw new Error('Refusing webhook write test: set ALLOW_WEBHOOK_WRITE_TEST=true');
+}
+if (!process.env.API_URL) throw new Error('API_URL is required');
+const target = new URL(process.env.API_URL);
+if (!['localhost', '127.0.0.1', '::1'].includes(target.hostname) && process.env.ALLOW_REMOTE_WEBHOOK_TEST !== 'true') {
+  throw new Error('Refusing remote webhook target: set ALLOW_REMOTE_WEBHOOK_TEST=true');
+}
 
 // Simulate Midtrans webhook notification
 const simulateWebhook = async () => {
-  const baseUrl = process.env.API_URL || 'http://localhost:3001';
+  const baseUrl = process.env.API_URL.replace(/\/$/, '');
   const orderId = `ORDER-TEST-${Date.now()}`;
   const transactionId = `TRANS-TEST-${Date.now()}`;
 

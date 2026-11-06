@@ -30,9 +30,10 @@ const BookVideoDialog = ({ selected, onClose }: { selected: SelectedBookVideo | 
             />
           </div>
           <p className="text-center text-xs text-muted-foreground">Video tidak tersedia atau tidak bisa diputar? Buka langsung di YouTube.</p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Button variant="outline" asChild><a href={parsed.url} target="_blank" rel="noopener noreferrer">Buka di YouTube ↗</a></Button>
-            <Button variant="secondary" asChild><Link to={`/buku/${selected.slug}#video-buku`} onClick={onClose}>Lihat semua video</Link></Button>
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col gap-2 border-t bg-background/95 p-4 sm:static sm:m-0 sm:flex-row sm:justify-center sm:border-0 sm:bg-transparent sm:p-0">
+            <Button className="w-full sm:w-auto" variant="outline" asChild><a href={parsed.url} target="_blank" rel="noopener noreferrer">Buka di YouTube ↗</a></Button>
+            <Button className="w-full sm:w-auto" variant="secondary" asChild><Link to={`/buku/${selected.slug}#video-buku`} onClick={onClose}>Lihat semua video</Link></Button>
+            <Button className="w-full sm:hidden" variant="ghost" onClick={onClose}>Tutup</Button>
           </div>
         </DialogContent>
       )}

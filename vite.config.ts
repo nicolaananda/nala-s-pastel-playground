@@ -1,4 +1,4 @@
-import { defineConfig, splitVendorChunkPlugin } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { imagetools } from "vite-imagetools";
@@ -18,7 +18,6 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    splitVendorChunkPlugin(),
     imagetools({
       defaultDirectives: (url) => {
         // Convert to WebP by default for better compression
@@ -69,7 +68,7 @@ export default defineConfig({
       },
     },
     // Chunk size warning limit
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 600,
     // Source maps for production (optional, set to false for smaller builds)
     sourcemap: false,
     // CSS code splitting - false for faster initial render

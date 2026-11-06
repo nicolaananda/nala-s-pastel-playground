@@ -61,8 +61,20 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use((req,res,next)=>req.method==='POST'&&['/api/admin/member/worksheets','/api/admin/member/course-thumbnails','/api/member/program/artworks'].includes(req.path)?next():express.json({limit:'2mb'})(req,res,next));
+app.use((req,res,next)=>req.method==='POST'&&['/api/admin/member/worksheets','/api/admin/member/course-thumbnails','/api/member/program/artworks','/api/client-errors'].includes(req.path)?next():express.json({limit:'2mb'})(req,res,next));
 app.use('/uploads', express.static(uploadDir));
+
+const clientErrorWindows = new Map();
+app.post('/api/client-errors', express.json({limit:'32kb',type:'application/json'}), (req,res) => {
+  const key=req.ip,now=Date.now(),window=clientErrorWindows.get(key)||{start:now,count:0};
+  if(now-window.start>60_000){window.start=now;window.count=0}
+  if(++window.count>10)return res.status(429).json({message:'Too many reports'});
+  clientErrorWindows.set(key,window);
+  const body=req.body,valid=body&&typeof body==='object'&&!Array.isArray(body)&&['kind','code','route'].every(k=>typeof body[k]==='string'&&body[k].length>0&&body[k].length<=200)&&Object.keys(body).every(k=>['kind','code','route'].includes(k));
+  if(!valid)return res.status(400).json({message:'Invalid report'});
+  console.error('client_error',{kind:body.kind,code:body.code,route:body.route});
+  res.status(204).end();
+});
 
 const memberStore = createMemberStore(pool);
 export const memberMailer = async ({to,purpose,token,reminderKey,expiresAt}) => {

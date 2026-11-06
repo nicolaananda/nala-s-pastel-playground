@@ -105,6 +105,10 @@ const BestSellerBooks = () => {
                       alt={book.title}
                       className="h-full w-full object-cover shadow-md transition-shadow duration-300 group-hover:shadow-lg"
                       loading="lazy"
+                      decoding="async"
+                      width={600}
+                      height={750}
+                      sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 768px) calc(50vw - 36px), 352px"
                       onError={(event) => {
                         event.currentTarget.onerror = null;
                         event.currentTarget.src = book.imageFallback;
