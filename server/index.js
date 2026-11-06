@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import midtransClient from 'midtrans-client';
 import axios from 'axios';
 import { db, initDatabase, pool } from './db.js';
+import { checkoutSettlementEvent, sanitizeCheckoutEvent } from './checkout-monitoring.js';
 import { createAdminSessionStore } from './admin-session-store.js';
 import { createMemberStore } from './member-db.js';
 import {adminLoginLimit} from './admin-login-limit.js';
@@ -61,10 +62,21 @@ app.use(cors({
   },
   credentials: true,
 }));
-app.use((req,res,next)=>req.method==='POST'&&['/api/admin/member/worksheets','/api/admin/member/course-thumbnails','/api/member/program/artworks','/api/client-errors'].includes(req.path)?next():express.json({limit:'2mb'})(req,res,next));
+app.use((req,res,next)=>req.method==='POST'&&['/api/admin/member/worksheets','/api/admin/member/course-thumbnails','/api/member/program/artworks','/api/client-errors','/api/checkout-events'].includes(req.path)?next():express.json({limit:'2mb'})(req,res,next));
 app.use('/uploads', express.static(uploadDir));
 
 const clientErrorWindows = new Map();
+const checkoutEventWindows = new Map();
+app.post('/api/checkout-events', express.json({limit:'1kb',type:'application/json'}), (req,res) => {
+  const key=req.ip,now=Date.now(),window=checkoutEventWindows.get(key)||{start:now,count:0};
+  if(now-window.start>60_000){window.start=now;window.count=0}
+  if(++window.count>20)return res.status(429).json({message:'Too many events'});
+  checkoutEventWindows.set(key,window);
+  const event=sanitizeCheckoutEvent(req.body);
+  if(!event)return res.status(400).json({message:'Invalid event'});
+  console.info('checkout_funnel',event);
+  res.status(204).end();
+});
 app.post('/api/client-errors', express.json({limit:'32kb',type:'application/json'}), (req,res) => {
   const key=req.ip,now=Date.now(),window=clientErrorWindows.get(key)||{start:now,count:0};
   if(now-window.start>60_000){window.start=now;window.count=0}
@@ -1008,6 +1020,10 @@ app.post('/api/midtrans/notification', async (req, res) => {
     const fraudStatus = notification.fraud_status;
     const orderId = notification.order_id;
     const transactionId = notification.transaction_id;
+    const settlementEvent=checkoutSettlementEvent(transactionStatus);
+    const settlementBookSlug=Array.isArray(notification.item_details)?String(notification.item_details.find(item=>item.id!=='shipping')?.id||''):'';
+    const settlementRecord=sanitizeCheckoutEvent({event:settlementEvent,route:'/buku/:slug',bookSlug:settlementBookSlug,reason:['settlement','capture'].includes(transactionStatus)?'none':transactionStatus==='deny'?'denied':transactionStatus==='expire'?'expired':'cancelled'});
+    if(orderId?.startsWith('BOOK-')&&settlementRecord)console.info('checkout_funnel',settlementRecord);
 
     console.log(`Received notification for order ${orderId}: ${transactionStatus}`);
 

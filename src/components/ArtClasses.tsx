@@ -10,13 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import ClassRegistrationForm from "@/components/ClassRegistrationForm";
 // @ts-ignore - vite-imagetools handles this
-import beginnerImg from "@/assets/begin.jpeg?w=400&format=webp&quality=65";
+import beginnerImg from "@/assets/begin.jpeg?w=320;400;704&format=webp&quality=65&as=srcset";
 import beginnerImgFallback from "@/assets/begin.jpeg";
 // @ts-ignore - vite-imagetools handles this
-import beginnerDrawingImg from "@/assets/begsed.jpeg?w=400&format=webp&quality=65";
+import beginnerDrawingImg from "@/assets/begsed.jpeg?w=320;400;704&format=webp&quality=65&as=srcset";
 import beginnerDrawingImgFallback from "@/assets/begsed.jpeg";
 // @ts-ignore - vite-imagetools handles this
-import intermediateDrawingImg from "@/assets/interkolor.jpeg?w=400&format=webp&quality=65";
+import intermediateDrawingImg from "@/assets/interkolor.jpeg?w=320;400;704&format=webp&quality=65&as=srcset";
 import intermediateDrawingImgFallback from "@/assets/interkolor.jpeg";
 
 const classes = [
@@ -109,8 +109,8 @@ const ArtClasses = () => {
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       loading="lazy"
                       decoding="async"
-                      width="400"
-                      height="224"
+                      width="1080"
+                      height="1350"
                       sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                     />
                   </picture>

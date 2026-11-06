@@ -59,10 +59,8 @@ export default defineConfig({
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
         manualChunks(id) {
-          // Only isolate the heavy Grasp Guide page; let Rollup decide other vendor chunks to avoid circular deps.
-          if (id.includes('src/pages/GraspGuide')) {
-            return 'grasp-guide';
-          }
+          // Keep the heavy Grasp feature out of the shared entry used by every page.
+          if (id.includes('src/pages/GraspGuide')) return 'grasp-guide';
           return undefined;
         },
       },

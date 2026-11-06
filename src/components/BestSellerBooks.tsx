@@ -5,11 +5,11 @@ import { ContentItem, fetchPublicContent, getBootContent } from "@/lib/cms";
 import { Button } from "@/components/ui/button";
 import BookVideoDialog, { SelectedBookVideo } from "@/components/BookVideoDialog";
 import { BookVideo, getBookVideos } from "../../shared/book-videos.js";
-import book1Image from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg?w=600&format=webp&quality=85";
+import book1Image from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg?w=240;320;379&format=webp&quality=85&as=srcset";
 import book1ImageFallback from "@/assets/tips-trik-juara-1-lomba-mewarnai-1.jpg";
-import book2Image from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg?w=600&format=webp&quality=85";
+import book2Image from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg?w=240;320;379&format=webp&quality=85&as=srcset";
 import book2ImageFallback from "@/assets/NEW-Lets-Coloring-Your-Anime.jpg";
-import book3Image from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg?w=600&format=webp&quality=85";
+import book3Image from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg?w=240;320;379&format=webp&quality=85&as=srcset";
 import book3ImageFallback from "@/assets/Coloring_Work_Sheet_Juara1_lomba_mewarnai.jpg";
 
 const fallbackBooks: Array<{ id: string; title: string; description: string; image: string; imageFallback: string; price: number; gradient: string; videos?: BookVideo[] }> = [
@@ -101,13 +101,14 @@ const BestSellerBooks = () => {
                 <CardHeader className="p-4 sm:p-6">
                   <Link to={`/buku/${book.id}`} aria-label={`Lihat detail ${book.title}`} className="block mb-4 aspect-[4/5] overflow-hidden rounded-xl bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                     <img
-                      src={book.image}
+                      src={book.imageFallback}
+                      srcSet={book.image === book.imageFallback ? undefined : book.image}
                       alt={book.title}
                       className="h-full w-full object-cover shadow-md transition-shadow duration-300 group-hover:shadow-lg"
                       loading="lazy"
                       decoding="async"
-                      width={600}
-                      height={750}
+                      width={379}
+                      height={500}
                       sizes="(max-width: 640px) calc(100vw - 32px), (max-width: 768px) calc(50vw - 36px), 352px"
                       onError={(event) => {
                         event.currentTarget.onerror = null;

@@ -45,6 +45,7 @@ interface CheckoutFormProps {
 }
 
 const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: CheckoutFormProps) => {
+  const monitor = (event: string, reason = "none") => { const base=import.meta.env.VITE_API_URL||""; void fetch(`${base}/api/checkout-events`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event,route:"/buku/:slug",bookSlug:bookId,reason}),keepalive:true}).catch(()=>{}); };
   const [village, setVillage] = useState<VillageOption | null>(null);
   const [shippingOptions, setShippingOptions] = useState<ShippingCost[]>([]);
   const [selectedShippingCost, setSelectedShippingCost] = useState<number>(0);
@@ -62,6 +63,10 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
     resolver: zodResolver(checkoutSchema),
     defaultValues: (() => { try { return JSON.parse(sessionStorage.getItem(`checkout-draft:${bookId}`) || "null")?.fields; } catch { return undefined; } })(),
   });
+
+  useEffect(() => {
+    monitor("checkout_opened");
+  }, [bookId]);
 
   useEffect(() => {
     try { const draft = JSON.parse(sessionStorage.getItem(`checkout-draft:${bookId}`) || "null"); if (draft?.village) setVillage(draft.village); } catch { /* Storage may be unavailable. */ }
@@ -95,6 +100,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
           setSelectedShippingCost(0);
         }
       } catch (error) {
+        monitor("shipping_failed", error instanceof TypeError ? "network" : "provider");
         console.error("Shipping calculation error:", error);
         if (!cancelled) {
           setShippingOptions([]);
@@ -144,16 +150,20 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
       };
 
       const paymentResponse = await createMidtransPaymentLink(paymentRequest);
+      if (!paymentResponse.paymentUrl) throw Object.assign(new Error("Gagal membuat payment link"), { monitoringReason: "invalid_response" });
       sessionStorage.removeItem(`checkout-draft:${bookId}`);
 
       toast.success("Payment link berhasil dibuat!");
 
       if (onPaymentSuccess) {
+        monitor("payment_redirected");
         onPaymentSuccess(paymentResponse.paymentUrl);
       } else {
+        monitor("payment_redirected");
         window.location.href = paymentResponse.paymentUrl;
       }
     } catch (error) {
+      monitor("payment_link_failed", error instanceof TypeError ? "network" : error && typeof error === "object" && "monitoringReason" in error ? "invalid_response" : "provider");
       console.error("Payment error:", error);
       toast.error(error instanceof Error ? error.message : "Gagal membuat payment link");
     } finally {

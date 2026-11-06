@@ -1,10 +1,8 @@
 // @ts-ignore - vite-imagetools handles this
-import cloudBg from "@/assets/cloud-background.jpg?w=1920&format=webp&quality=80";
+import cloudBg from "@/assets/cloud-background.jpg?w=236;368&format=webp&quality=80&as=srcset";
 import cloudBgFallback from "@/assets/cloud-background.jpg";
 // @ts-ignore - vite-imagetools handles this
-import nalaLogo from "@/assets/nala-logo.png?w=448&format=webp&quality=80";
-// @ts-ignore - vite-imagetools handles this
-import nalaLogo2x from "@/assets/nala-logo.png?w=896&format=webp&quality=75";
+import nalaLogo from "@/assets/nala-logo.png?w=256;320;384;448;896&format=webp&quality=80&as=srcset";
 import nalaLogoFallback from "@/assets/nala-logo.png";
 
 const Hero = () => {
@@ -15,23 +13,17 @@ const Hero = () => {
       {/* Background Image */}
       <div 
         className="absolute inset-0 z-0"
-        style={{
-          backgroundImage: `url(${cloudBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-        }}
       >
         <picture>
-          <source srcSet={cloudBg} type="image/webp" />
+          <source srcSet={cloudBg} sizes="100vw" type="image/webp" />
         <img 
           src={cloudBgFallback} 
           alt="Background awan untuk Nala Art Studio" 
-          className="absolute inset-0 w-full h-full object-cover opacity-0"
+          className="absolute inset-0 w-full h-full object-cover"
           loading="eager"
           decoding="async"
-          width="1920"
-          height="1080"
+          width="368"
+          height="626"
           aria-hidden="true"
         />
         </picture>
@@ -57,7 +49,7 @@ const Hero = () => {
         <div className="mb-6 sm:mb-8 animate-bounce-in">
           <picture>
             <source 
-              srcSet={`${nalaLogo} 448w, ${nalaLogo2x} 896w`}
+              srcSet={nalaLogo}
               sizes="(max-width: 640px) 256px, (max-width: 768px) 320px, (max-width: 1024px) 384px, 448px"
               type="image/webp" 
             />
@@ -68,8 +60,8 @@ const Hero = () => {
               loading="eager"
               fetchPriority="high"
               decoding="async"
-              width="448"
-              height="448"
+              width="2362"
+              height="2362"
               sizes="(max-width: 640px) 256px, (max-width: 768px) 320px, (max-width: 1024px) 384px, 448px"
             />
           </picture>
