@@ -158,13 +158,19 @@ const memoryContentItems = defaultContentItems.map((item) => ({
   updated_at: new Date(),
 }));
 
+const requiredDbEnv = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+if (process.env.NODE_ENV === 'production') {
+  const missing = requiredDbEnv.filter((key) => !process.env[key]);
+  if (missing.length) throw new Error(`Missing production database configuration: ${missing.join(', ')}`);
+}
+
 // Database connection configuration
 const pool = new Pool({
-  host: process.env.DB_HOST || '119.28.114.89',
+  host: process.env.DB_HOST,
   port: process.env.DB_PORT || 5432,
-  database: process.env.DB_NAME || 'nala',
-  user: process.env.DB_USER || 'bot_wa',
-  password: process.env.DB_PASSWORD || 'bot_wa',
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
   ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
 });
 export { pool };

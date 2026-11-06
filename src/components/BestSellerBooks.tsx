@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ContentItem, fetchPublicContent, getBootContent } from "@/lib/cms";
+import { ContentItem, fetchPublicContent, getBootContent, responsiveImageProps } from "@/lib/cms";
 import { Button } from "@/components/ui/button";
 import BookVideoDialog, { SelectedBookVideo } from "@/components/BookVideoDialog";
 import { BookVideo, getBookVideos } from "../../shared/book-videos.js";
@@ -43,6 +43,7 @@ const fallbackBooks: Array<{ id: string; title: string; description: string; ima
 ];
 
 const cmsBookToCard = (item: ContentItem) => ({
+  cmsItem: item,
   id: item.slug,
   title: item.title,
   description: String(item.metadata?.shortDescription || item.description.split("\n\n")[0] || "").slice(0, 180),
@@ -101,8 +102,7 @@ const BestSellerBooks = () => {
                 <CardHeader className="p-4 sm:p-6">
                   <Link to={`/buku/${book.id}`} aria-label={`Lihat detail ${book.title}`} className="block mb-4 aspect-[4/5] overflow-hidden rounded-xl bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                     <img
-                      src={book.imageFallback}
-                      srcSet={book.image === book.imageFallback ? undefined : book.image}
+                      {...(book.cmsItem ? responsiveImageProps(book.cmsItem, "(max-width: 640px) calc(100vw - 32px), (max-width: 768px) calc(50vw - 36px), 352px") : { src: book.imageFallback, srcSet: book.image === book.imageFallback ? undefined : book.image })}
                       alt={book.title}
                       className="h-full w-full object-cover shadow-md transition-shadow duration-300 group-hover:shadow-lg"
                       loading="lazy"

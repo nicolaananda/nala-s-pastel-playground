@@ -55,6 +55,11 @@ export function publicSeoContent(data, assets = {}) {
       const metadata = { contentFormat: 'plain' };
       for (const key of ['shortDescription','gradient','displayDate','location']) if (typeof meta[key] === 'string') metadata[key] = plainText(meta[key], true);
       if (typeof meta.featured === 'boolean') metadata.featured = meta.featured;
+      if (meta.responsiveImage && typeof meta.responsiveImage === 'object') {
+        const image = meta.responsiveImage;
+        const variants = Array.isArray(image.variants) ? image.variants.filter(v => v && [320,640,960].includes(v.width)).map(v => ({width:v.width,url:publicImage(v.url)})) : [];
+        if (Number.isInteger(image.width) && Number.isInteger(image.height) && image.width > 0 && image.height > 0 && variants.length) metadata.responsiveImage = {url:publicImage(image.url),width:image.width,height:image.height,variants};
+      }
       if (type === 'book') metadata.videos = getBookVideos(meta.videos);
       if (Array.isArray(meta.winners)) metadata.winners = meta.winners.filter(w => w && typeof w.name === 'string').map(w => ({
         name: w.name, position: typeof w.position === 'string' ? w.position : '',

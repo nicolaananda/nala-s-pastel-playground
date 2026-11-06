@@ -4,15 +4,18 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const { Client } = pg;
+const required = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+const missing = required.filter((key) => !process.env[key]);
+if (missing.length) throw new Error(`Missing database configuration: ${missing.join(', ')}`);
 
 // Connect to default postgres database to create the target database
 const createDatabase = async () => {
   const adminClient = new Client({
-    host: process.env.DB_HOST || 'nicola.id',
+    host: process.env.DB_HOST,
     port: process.env.DB_PORT || 5432,
     database: 'postgres', // Connect to default postgres database
-    user: process.env.DB_USER || 'bot_wa',
-    password: process.env.DB_PASSWORD || 'bot_wa',
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
     ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
   });
 
@@ -20,7 +23,7 @@ const createDatabase = async () => {
     await adminClient.connect();
     console.log('✅ Connected to PostgreSQL server');
 
-    const dbName = process.env.DB_NAME || 'nala';
+    const dbName = process.env.DB_NAME;
     
     // Check if database exists
     const checkQuery = `
@@ -43,7 +46,7 @@ const createDatabase = async () => {
     
     // If database already exists, that's okay
     if (error.code === '42P04') {
-      console.log(`ℹ️  Database "${process.env.DB_NAME || 'nala'}" already exists`);
+      console.log(`ℹ️  Database "${process.env.DB_NAME}" already exists`);
       process.exit(0);
     } else {
       console.error(error);

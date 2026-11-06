@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Footer from "@/components/Footer";
 
 import { Calendar, MapPin } from "lucide-react";
-import { fetchPublicContent, getBootContent, cmsArticleToView } from "@/lib/cms";
+import { fetchPublicContent, getBootContent, cmsArticleToView, responsiveImageProps } from "@/lib/cms";
 import Seo from '@/components/Seo';
 
 const stripHtml = (value: string) => value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
@@ -108,12 +108,12 @@ const CompetitionNews = () => {
                     {article.photos.length > 0 && (
                       <div className="mb-4">
                         <picture>
-                          <source srcSet={article.photos[0].src} type="image/webp" />
-                          <img 
-                            src={article.photos[0].srcFallback} 
+                          <img
+                            {...responsiveImageProps(article.cmsItem, "(max-width: 768px) calc(100vw - 32px), 544px")}
                             alt={article.photos[0].alt}
                             className="w-full rounded-xl shadow-md object-cover group-hover:shadow-lg transition-shadow duration-300"
                             loading="lazy"
+                            decoding="async"
                           />
                         </picture>
                       </div>

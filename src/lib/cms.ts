@@ -20,6 +20,13 @@ export interface ContentItem {
   updatedAt?: string;
 }
 
+export interface ResponsiveImage { url: string; width: number; height: number; variants: Array<{width:number;url:string}> }
+export const responsiveImageProps = (item?: ContentItem | null, sizes = "100vw") => {
+  const image = item?.metadata?.responsiveImage as ResponsiveImage | undefined;
+  if (!image?.variants?.length || !item?.imageUrl) return { src: item?.imageUrl || undefined };
+  return { src: item.imageUrl, srcSet: image.variants.map(v => `${v.url} ${v.width}w`).join(', '), sizes, width: image.width, height: image.height };
+};
+
 export interface CompetitionRegistration { id:number; competitionId:number; competitionTitle:string; registrationCode:string; participantName:string; birthDate:string; schoolName:string; parentName:string; whatsapp:string; email:string; bookProofUrl?:string|null; amount:number; paymentStatus:string; transactionId?:string|null; checkedInAt?:string|null; archivedAt?:string|null; createdAt:string }
 
 export interface MediaItem {
@@ -120,6 +127,7 @@ export const adminApi = {
   restoreCode: (code: string) => requestJson<{ record: AccessRecord }>(`/api/admin/access-codes/${code}/restore`, { method: "POST" }),
   generateCode: (orderId: string) => requestJson<{ code: string }>(`/api/transaction/${orderId}/generate-code`, { method: "POST", body: JSON.stringify({}) }),
   auditLogs: () => requestJson<{ logs: Array<Record<string, unknown>> }>("/api/admin/audit-logs"),
+  checkoutFunnel: () => requestJson<{ periods: Array<{ days: number; books: Array<{ bookSlug: string; events: Record<string, number> }> }> }>("/api/admin/checkout-funnel"),
   competitionRegistrations: (competitionId?: number, archived = false) => requestJson<{ registrations: CompetitionRegistration[] }>(`/api/admin/competition-registrations${competitionId ? `?competitionId=${competitionId}&archived=${archived}` : ""}`),
   createCompetitionRegistration: (competitionId:number, data:Record<string, unknown>) => requestJson<{registration:CompetitionRegistration}>(`/api/admin/competitions/${competitionId}/participants`,{method:"POST",body:JSON.stringify(data)}),
   updateCompetitionRegistration: (competitionId:number,id:number,data:Record<string, unknown>) => requestJson<{registration:CompetitionRegistration}>(`/api/admin/competitions/${competitionId}/participants/${id}`,{method:"PATCH",body:JSON.stringify(data)}),
@@ -143,6 +151,6 @@ export const adminApi = {
       const error = await response.json().catch(() => ({ message: response.statusText }));
       throw new Error(error.message || "Upload failed");
     }
-    return response.json() as Promise<{ upload: { url: string; title: string; type: string } }>;
+    return response.json() as Promise<{ upload: { url: string; title: string; type: string; image?: ResponsiveImage | null } }>;
   },
 };

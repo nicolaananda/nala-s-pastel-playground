@@ -59,12 +59,13 @@ const clampExcerpt = (value: string) => value.replace(/<[^>]+>/g, "").replace(/\
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { module = "content" } = useParams();
-  const modules = ["content","competitions","premium-access","uploads","audit"];
+  const modules = ["content","competitions","premium-access","checkout-funnel","uploads","audit"];
   const [adminEmail, setAdminEmail] = useState("");
   const [items, setItems] = useState<ContentItem[]>([]);
   const [transactions, setTransactions] = useState<AccessRecord[]>([]);
   const [logs, setLogs] = useState<Array<Record<string, unknown>>>([]);
   const [registrations,setRegistrations]=useState<CompetitionRegistration[]>([]);
+  const [checkoutFunnel,setCheckoutFunnel]=useState<Array<{days:number;books:Array<{bookSlug:string;events:Record<string,number>}>}>>([]);
 
   const [selectedType, setSelectedType] = useState<ContentType>("book");
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,6 +105,7 @@ const AdminDashboard = () => {
     setLogs(auditData.logs);
     setMedia(mediaData.media);
     setRegistrations(registrationData.registrations);
+    if (module === "checkout-funnel") setCheckoutFunnel((await adminApi.checkoutFunnel()).periods);
   };
 
   useEffect(() => {
@@ -232,7 +234,7 @@ const AdminDashboard = () => {
     try {
       const result = await adminApi.uploadFile(file);
       if (target === "image") {
-        setFormItem((item) => ({ ...item, imageUrl: result.upload.url }));
+        setFormItem((item) => ({ ...item, imageUrl: result.upload.url, metadata: { ...item.metadata, ...(result.upload.image ? { responsiveImage: result.upload.image } : {}) } }));
       } else {
         setFormItem((item) => ({ ...item, fileUrl: result.upload.url }));
       }
@@ -299,6 +301,7 @@ const AdminDashboard = () => {
 
             <TabsTrigger value="competitions">Lomba</TabsTrigger>
             <TabsTrigger value="premium-access">Premium Access</TabsTrigger>
+            <TabsTrigger value="checkout-funnel">Checkout Funnel</TabsTrigger>
             <TabsTrigger value="uploads">Uploads</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
           </TabsList>
@@ -516,6 +519,8 @@ const AdminDashboard = () => {
             <Card><CardHeader><CardTitle>Generate Kode Manual</CardTitle></CardHeader><CardContent className="flex gap-2"><Input placeholder="Order ID" value={manualOrderId} onChange={(event) => setManualOrderId(event.target.value)} /><Button onClick={generateCode}>Generate</Button></CardContent></Card>
             <Card><CardHeader><CardTitle>Premium Access Codes</CardTitle></CardHeader><CardContent className="space-y-3">{transactions.map((record) => <div key={`${record.transactionId}-${record.code}`} className="rounded-xl border p-3 text-sm"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><b>{record.code}</b> · {record.orderId} · {record.customer?.email || "no email"}{record.revokedAt ? <span className="ml-2 text-destructive">revoked</span> : null}</div><div className="flex gap-2"><Button size="sm" variant="outline" onClick={() => adminApi.restoreCode(record.code).then(loadAll)}>Restore</Button><Button size="sm" variant="destructive" onClick={() => adminApi.revokeCode(record.code, "Admin revoke").then(loadAll)}>Revoke</Button></div></div></div>)}</CardContent></Card>
           </TabsContent>
+
+          <TabsContent value="checkout-funnel" className="space-y-4">{checkoutFunnel.map(period=><Card key={period.days}><CardHeader><CardTitle>{period.days} hari terakhir</CardTitle></CardHeader><CardContent className="space-y-3">{period.books.map(book=><div key={book.bookSlug} className="rounded-xl border p-4"><b>{book.bookSlug}</b><div className="mt-2 grid gap-2 sm:grid-cols-3">{Object.entries(book.events).map(([event,count])=><div key={event}><span className="text-sm text-muted-foreground">{event}</span><p className="text-2xl font-bold">{count}</p></div>)}</div></div>)}{period.books.length===0?<p className="text-sm text-muted-foreground">Belum ada event.</p>:null}</CardContent></Card>)}</TabsContent>
 
           <TabsContent value="uploads" className="space-y-4">
             <Card><CardHeader><CardTitle>Upload / Asset Library</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-muted-foreground">Upload ke Cloudflare R2. Local fallback hanya tersedia saat development.</p><div className="space-y-3 rounded-2xl border p-4"><Label>Upload file</Label><Input type="file" accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,video/mp4" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadFile(event.target.files[0], "file")} />{uploading ? <p className="text-sm font-medium text-primary">Mengupload dan mengoptimalkan…</p> : null}<p className="text-xs text-muted-foreground">JPG, PNG, WebP, GIF, PDF, MP4. Maks 10MB.</p></div><div className="flex gap-2"><Input placeholder="https://..." value={uploadUrl} onChange={(event) => setUploadUrl(event.target.value)} /><Button onClick={registerUpload}>Catat URL</Button></div></CardContent></Card>

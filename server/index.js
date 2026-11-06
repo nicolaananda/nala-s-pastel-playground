@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import midtransClient from 'midtrans-client';
 import axios from 'axios';
 import { db, initDatabase, pool } from './db.js';
-import { checkoutSettlementEvent, sanitizeCheckoutEvent } from './checkout-monitoring.js';
+import { checkoutFunnelSummary, checkoutSettlementEvent, recordCheckoutEvent, sanitizeCheckoutEvent } from './checkout-monitoring.js';
 import { createAdminSessionStore } from './admin-session-store.js';
 import { createMemberStore } from './member-db.js';
 import {adminLoginLimit} from './admin-login-limit.js';
@@ -24,9 +24,11 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
+import { createResponsiveImages, responsiveMetadata } from './responsive-images.js';
 import { normalizeVideoMetadata, VideoValidationError } from '../shared/book-videos.js';
 import { refreshSeoSnapshots } from './seo-snapshots.js';
 import { publicSeoContent } from '../shared/seo.js';
+import { publicContentCache } from './public-content-cache.js';
 
 // Load environment variables
 dotenv.config();
@@ -67,7 +69,8 @@ app.use('/uploads', express.static(uploadDir));
 
 const clientErrorWindows = new Map();
 const checkoutEventWindows = new Map();
-app.post('/api/checkout-events', express.json({limit:'1kb',type:'application/json'}), (req,res) => {
+app.post('/api/checkout-events', express.json({limit:'1kb',type:'application/json'}), async (req,res,next) => {
+ try {
   const key=req.ip,now=Date.now(),window=checkoutEventWindows.get(key)||{start:now,count:0};
   if(now-window.start>60_000){window.start=now;window.count=0}
   if(++window.count>20)return res.status(429).json({message:'Too many events'});
@@ -75,7 +78,9 @@ app.post('/api/checkout-events', express.json({limit:'1kb',type:'application/jso
   const event=sanitizeCheckoutEvent(req.body);
   if(!event)return res.status(400).json({message:'Invalid event'});
   console.info('checkout_funnel',event);
+  await recordCheckoutEvent(pool,event);
   res.status(204).end();
+ } catch(error) { next(error); }
 });
 app.post('/api/client-errors', express.json({limit:'32kb',type:'application/json'}), (req,res) => {
   const key=req.ip,now=Date.now(),window=clientErrorWindows.get(key)||{start:now,count:0};
@@ -170,6 +175,7 @@ const requireAdmin = async (req, res, next) => {
 
 const adminBoundary=(req,res,next)=>{res.set('Cache-Control','private, no-store');if(!['GET','HEAD','OPTIONS'].includes(req.method)&&(!req.headers.origin||!allowedOrigins.includes(req.headers.origin)))return res.status(403).json({message:'Origin tidak diizinkan'});next()};
 app.use('/api/admin',adminBoundary);
+app.get('/api/admin/checkout-funnel',requireAdmin,async(req,res,next)=>{try{if(req.admin.role!=='owner')return res.status(403).json({message:'Owner access required'});res.json(await checkoutFunnelSummary(pool))}catch(error){next(error)}});
 app.use('/api/admin/member-rewards',requireAdmin,express.json({limit:'1mb'}),createRewardAdminRouter({pool}));
 app.use('/api/admin/member', requireAdmin, express.json({limit:'14mb'}), createMemberAdminRouter({
   pool,
@@ -439,7 +445,7 @@ const publicItem = item => ['book','article'].includes(item.type)
   ? publicSeoContent({books:item.type === 'book' ? [item] : [],articles:item.type === 'article' ? [item] : []})[item.type === 'book' ? 'books' : 'articles'][0]
   : item;
 
-app.get('/api/content/:type', async (req, res) => {
+app.get('/api/content/:type', publicContentCache, async (req, res) => {
   try {
     const items = await db.getPublicContent(req.params.type);
     res.json({ items: items.map(publicItem) });
@@ -449,7 +455,7 @@ app.get('/api/content/:type', async (req, res) => {
   }
 });
 
-app.get('/api/content/:type/:slug', async (req, res) => {
+app.get('/api/content/:type/:slug', publicContentCache, async (req, res) => {
   try {
     const item = await db.getPublicContentBySlug(req.params.type, req.params.slug);
     if (!item) return res.status(404).json({ message: 'Content not found' });
@@ -561,10 +567,16 @@ app.delete('/api/admin/content/:id', requireAdmin, async (req, res) => {
 app.post('/api/admin/uploads/file', requireAdmin, async (req, res) => {
   try {
     const rawUpload = await parseMultipartUpload(req);
+    const responsive = rawUpload.contentType.startsWith('image/') && rawUpload.ext !== '.gif' ? await createResponsiveImages(rawUpload.buffer) : null;
     const upload = await optimizeUpload(rawUpload);
     const safeBase = path.basename(upload.originalName, path.extname(upload.originalName)).replace(/[^a-z0-9-]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'asset';
     const filename = `admin/${Date.now()}-${safeBase}${upload.ext}`;
     let url = await uploadToR2({ key: filename, buffer: upload.buffer, contentType: upload.contentType });
+    let variants = [];
+    if (url && responsive) variants = await Promise.all(responsive.variants.map(async variant => {
+      const key = filename.replace(/\.webp$/, `-${variant.width}w.webp`);
+      return { width: variant.width, url: await uploadToR2({ key, buffer: variant.buffer, contentType: 'image/webp' }) };
+    }));
 
     if (!url) {
       if (process.env.NODE_ENV === 'production') {
@@ -576,10 +588,16 @@ app.post('/api/admin/uploads/file', requireAdmin, async (req, res) => {
       await fs.writeFile(filePath, upload.buffer);
       const baseUrl = (process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
       url = `${baseUrl}/uploads/${localFilename}`;
+      if (responsive) variants = await Promise.all(responsive.variants.map(async variant => {
+        const variantFilename = localFilename.replace(/\.webp$/, `-${variant.width}w.webp`);
+        await fs.writeFile(path.join(uploadDir, variantFilename), variant.buffer);
+        return { width: variant.width, url: `${baseUrl}/uploads/${variantFilename}` };
+      }));
     }
 
+    const image = responsive ? responsiveMetadata({ url, width: responsive.width, height: responsive.height, variants }) : null;
     await db.logAdminAction({ adminEmail: req.admin.email, action: 'upload_file', entityType: 'upload', details: { url, originalName: upload.originalName, contentType: upload.contentType, storage: r2Config() ? 'r2' : 'local', optimized: Boolean(upload.optimized), originalSize: upload.originalSize, optimizedSize: upload.optimizedSize } });
-    res.json({ upload: { url, title: upload.originalName, type: upload.contentType, optimized: Boolean(upload.optimized), originalSize: upload.originalSize, optimizedSize: upload.optimizedSize } });
+    res.json({ upload: { url, title: upload.originalName, type: upload.contentType, optimized: Boolean(upload.optimized), originalSize: upload.originalSize, optimizedSize: upload.optimizedSize, image } });
   } catch (error) {
     console.error('Upload file error:', error);
     res.status(400).json({ message: error.message || 'Failed to upload file' });

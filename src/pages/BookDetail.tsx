@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 import SimpleContent from "@/components/SimpleContent";
 import Seo from "@/components/Seo";
 import CheckoutForm from "@/components/CheckoutForm";
-import { ContentItem, fetchPublicContentItem, getBootContent } from "@/lib/cms";
+import { ContentItem, fetchPublicContentItem, getBootContent, responsiveImageProps } from "@/lib/cms";
 import { itemSchema } from '../../shared/seo.js';
 import BookVideoDialog, { SelectedBookVideo } from "@/components/BookVideoDialog";
 import { BookVideo, getBookVideos, parseYouTubeUrl } from "../../shared/book-videos.js";
@@ -194,7 +194,7 @@ const BookDetail = () => {
             
             <div className="mb-6 overflow-hidden rounded-xl bg-muted shadow-lg sm:rounded-2xl">
               <img
-                src={book.image}
+                {...(book.cmsItem ? responsiveImageProps(book.cmsItem, "(max-width: 896px) calc(100vw - 64px), 768px") : {src:book.image})}
                 alt={book.title}
                 className="h-auto w-full object-cover"
                 width={800}

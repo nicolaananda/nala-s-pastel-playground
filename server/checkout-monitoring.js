@@ -25,3 +25,29 @@ export function checkoutSettlementEvent(status) {
   if (['cancel', 'deny', 'expire'].includes(status)) return 'settlement_failed';
   return null;
 }
+
+export async function recordCheckoutEvent(pool, event) {
+  await pool.query('INSERT INTO checkout_funnel_events (event, route, book_slug, reason) VALUES ($1,$2,$3,$4)', [event.event, event.route, event.bookSlug, event.reason]);
+}
+
+export async function checkoutFunnelSummary(pool) {
+  const { rows } = await pool.query(`
+    SELECT periods.days, events.book_slug AS "bookSlug", events.event, COUNT(*)::int count
+    FROM (VALUES (7), (30)) periods(days)
+    JOIN checkout_funnel_events events
+      ON events.occurred_at >= NOW() - periods.days * INTERVAL '1 day'
+    GROUP BY periods.days, events.book_slug, events.event
+    ORDER BY periods.days, events.book_slug, events.event
+  `);
+  return {
+    periods: [7, 30].map(days => ({
+      days,
+      books: rows.filter(row => Number(row.days) === days).reduce((books, row) => {
+        let book = books.find(item => item.bookSlug === row.bookSlug);
+        if (!book) { book = { bookSlug: row.bookSlug, events: {} }; books.push(book); }
+        book.events[row.event] = Number(row.count);
+        return books;
+      }, []),
+    })),
+  };
+}

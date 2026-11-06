@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Footer from "@/components/Footer";
 
 import { Calendar, MapPin, Trophy } from "lucide-react";
-import { fetchPublicContentItem, getBootContent, cmsArticleToView } from "@/lib/cms";
+import { fetchPublicContentItem, getBootContent, cmsArticleToView, responsiveImageProps } from "@/lib/cms";
 import { itemSchema } from '../../shared/seo.js';
 import Seo from "@/components/Seo";
 
@@ -108,12 +108,12 @@ const CompetitionArticleDetail = () => {
                 {article.photos.map((photo, index) => (
                   <div key={index} className="rounded-xl overflow-hidden shadow-lg">
                     <picture>
-                      <source srcSet={photo.src} type="image/webp" />
-                      <img 
-                        src={photo.srcFallback} 
+                      <img
+                        {...(index === 0 ? responsiveImageProps(article.cmsItem, "(max-width: 896px) calc(100vw - 32px), 768px") : { src: photo.srcFallback })}
                         alt={photo.alt}
                         className="w-full object-cover"
                         loading="lazy"
+                        decoding="async"
                       />
                     </picture>
                     {photo.caption && (
