@@ -1,4 +1,5 @@
-export const MAX_BOOK_VIDEOS = 30;
+// ponytail: generous abuse ceiling, raise only if a book genuinely needs 1000+ videos.
+export const MAX_BOOK_VIDEOS = 1000;
 export const MAX_VIDEO_TITLE = 160;
 export const MAX_VIDEO_URL = 2048;
 
@@ -39,7 +40,7 @@ export function parseYouTubeUrl(value) {
 export function normalizeBookVideos(value) {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new VideoValidationError('Video buku harus berupa daftar {url, title}. Gunakan [] untuk menghapus semua video.');
-  if (value.length > MAX_BOOK_VIDEOS) throw new VideoValidationError(`Video buku maksimal ${MAX_BOOK_VIDEOS} baris.`);
+  if (value.length > MAX_BOOK_VIDEOS) throw new VideoValidationError('Daftar video terlalu besar.');
   const seen = new Set();
   const videos = [];
   value.forEach((row, index) => {

@@ -197,6 +197,23 @@ const BookDetail = () => {
           <CardContent className="p-4 sm:p-6 md:p-8 pt-0">
             <SimpleContent content={book.description} className="text-base leading-relaxed text-foreground sm:text-lg" />
 
+            <div className="mt-8 border-y-2 border-primary/20 py-6 text-center">
+              <div className="mb-4">
+                <span className="text-3xl font-bold text-primary sm:text-4xl">
+                  Rp {book.price.toLocaleString('id-ID')}
+                </span>
+              </div>
+              {!showCheckout ? (
+                <Button
+                  onClick={() => setShowCheckout(true)}
+                  size="lg"
+                  className="w-full bg-gradient-to-r from-primary via-yellow-400 to-primary bg-[length:200%_100%] px-8 py-6 text-lg hover:bg-[position:100%_0] sm:w-auto"
+                >
+                  🛒 Beli Sekarang
+                </Button>
+              ) : null}
+            </div>
+
             {book.videos?.length ? (
               <section id="video-buku" aria-labelledby="video-buku-title" className="mt-8 scroll-mt-6 rounded-2xl border-2 border-primary/20 bg-pink-50/50 p-4 sm:p-6">
                 <h2 id="video-buku-title" className="text-xl font-bold sm:text-2xl">Video Buku</h2>
@@ -215,24 +232,7 @@ const BookDetail = () => {
               </section>
             ) : null}
 
-            <div className="mt-8 pt-6 border-t-2 border-primary/20">
-              <div className="text-center">
-                <div className="mb-4">
-                  <span className="text-3xl sm:text-4xl font-bold text-primary">
-                    Rp {book.price.toLocaleString('id-ID')}
-                  </span>
-                </div>
-                {!showCheckout ? (
-                  <Button
-                    onClick={() => setShowCheckout(true)}
-                    size="lg"
-                    className="w-full sm:w-auto px-8 py-6 text-lg bg-gradient-to-r from-primary via-yellow-400 to-primary bg-[length:200%_100%] hover:bg-[position:100%_0]"
-                  >
-                    🛒 Beli Sekarang
-                  </Button>
-                ) : null}
-              </div>
-            </div>
+
           </CardContent>
         </Card>
 

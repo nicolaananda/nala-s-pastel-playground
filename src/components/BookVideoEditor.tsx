@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BookVideo, MAX_BOOK_VIDEOS, MAX_VIDEO_TITLE, MAX_VIDEO_URL } from "../../shared/book-videos.js";
+import { BookVideo, MAX_VIDEO_TITLE, MAX_VIDEO_URL } from "../../shared/book-videos.js";
 
 const BookVideoEditor = ({ metadataText, onChange }: { metadataText: string; onChange: (text: string) => void }) => {
   let metadata: Record<string, unknown>;
@@ -24,7 +24,7 @@ const BookVideoEditor = ({ metadataText, onChange }: { metadataText: string; onC
   return (
     <section aria-labelledby="book-videos-label" className="space-y-3 rounded-2xl border-2 border-primary/20 bg-pink-50/50 p-3">
       <h3 id="book-videos-label" className="font-semibold">Video YouTube Buku</h3>
-      <p className="text-xs text-muted-foreground">Video pertama menjadi video utama di beranda. Maksimal {MAX_BOOK_VIDEOS} video; URL duplikat digabung saat disimpan. Hapus semua baris untuk menyembunyikan video.</p>
+      <p className="text-xs text-muted-foreground">Video pertama menjadi video utama di beranda. URL duplikat digabung saat disimpan. Hapus semua baris untuk menyembunyikan video.</p>
       {videos.map((video, index) => (
         <div key={index} className="min-w-0 space-y-2 rounded-xl border bg-background p-3">
           <p className="text-sm font-semibold">Video {index + 1}{index === 0 ? " · Utama" : ""}</p>
@@ -39,7 +39,7 @@ const BookVideoEditor = ({ metadataText, onChange }: { metadataText: string; onC
           </div>
         </div>
       ))}
-      <Button type="button" variant="outline" disabled={videos.length >= MAX_BOOK_VIDEOS} onClick={() => update([...videos, { url: "", title: "" }])}>+ Tambah video</Button>
+      <Button type="button" variant="outline" onClick={() => update([...videos, { url: "", title: "" }])}>+ Tambah video</Button>
     </section>
   );
 };
