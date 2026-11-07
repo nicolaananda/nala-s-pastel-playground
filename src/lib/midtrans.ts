@@ -44,6 +44,7 @@ export interface MidtransPaymentRequest {
   bookTitle: string;
   price: number;
   shippingCost: number;
+  orderId?: string;
   customerDetails: {
     firstName: string;
     lastName: string;
@@ -71,7 +72,7 @@ export const createMidtransPaymentLink = async (
   // Prepare request body for backend API
   const requestBody = {
     transaction_details: {
-      order_id: `BOOK-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      order_id: request.orderId || `BOOK-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       gross_amount: totalAmount,
     },
     item_details: [

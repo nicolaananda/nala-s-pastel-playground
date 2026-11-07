@@ -19,7 +19,8 @@
     "test:db": "node server/test-db.js",
     "test:webhook": "node server/test-webhook.js",
     "test:insert": "node server/test-direct-db.js",
-    "generate:code": "node server/generate-missing-code.js"
+    "generate:code": "node server/generate-missing-code.js",
+    "check:performance": "node scripts/check-performance.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

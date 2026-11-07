@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -26,12 +26,12 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 const checkoutSchema = z.object({
-  firstName: z.string().min(2, "Nama depan minimal 2 karakter"),
-  lastName: z.string().min(2, "Nama belakang minimal 2 karakter"),
-  email: z.string().email("Email tidak valid"),
-  phone: z.string().min(10, "Nomor telepon minimal 10 digit"),
-  address: z.string().min(10, "Alamat lengkap minimal 10 karakter"),
-  postalCode: z.string().min(5, "Kode pos minimal 5 digit"),
+  firstName: z.string().trim().min(2, "Nama depan minimal 2 karakter"),
+  lastName: z.string().trim().min(2, "Nama belakang minimal 2 karakter"),
+  email: z.string().trim().email("Email tidak valid"),
+  phone: z.string().trim().regex(/^\+?[0-9][0-9 -]{8,14}[0-9]$/, "Nomor telepon tidak valid"),
+  address: z.string().trim().min(10, "Alamat lengkap minimal 10 karakter"),
+  postalCode: z.string().trim().regex(/^\d{5}$/, "Kode pos harus 5 digit"),
   shippingService: z.string().min(1, "Pilih layanan pengiriman"),
 });
 
@@ -52,6 +52,10 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
   const [isLoadingShipping, setIsLoadingShipping] = useState(false);
   const [shippingError, setShippingError] = useState("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+  const [villageError, setVillageError] = useState("");
+  const paymentPending = useRef(false);
+  const orderId = useRef(`BOOK-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
 
   const {
     register,
@@ -126,17 +130,21 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
 
   const onSubmit = async (data: CheckoutFormData) => {
     if (!village) {
-      toast.error("Pilih kelurahan/desa tujuan dulu");
+      setVillageError("Pilih kelurahan/desa tujuan dulu");
       return;
     }
+    if (paymentPending.current) return;
 
+    paymentPending.current = true;
     setIsProcessingPayment(true);
+    setPaymentError("");
     try {
       const paymentRequest: MidtransPaymentRequest = {
         bookId,
         bookTitle,
         price: bookPrice,
         shippingCost: selectedShippingCost,
+        orderId: orderId.current,
         customerDetails: {
           firstName: data.firstName,
           lastName: data.lastName,
@@ -165,8 +173,11 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
     } catch (error) {
       monitor("payment_link_failed", error instanceof TypeError ? "network" : error && typeof error === "object" && "monitoringReason" in error ? "invalid_response" : "provider");
       console.error("Payment error:", error);
-      toast.error(error instanceof Error ? error.message : "Gagal membuat payment link");
+      const message = error instanceof Error ? error.message : "Gagal membuat payment link";
+      setPaymentError(`${message} Data Anda tetap tersimpan.`);
+      toast.error(message);
     } finally {
+      paymentPending.current = false;
       setIsProcessingPayment(false);
     }
   };
@@ -178,6 +189,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
       <CardHeader>
         <CardTitle className="text-2xl font-bold">Form Pemesanan</CardTitle>
         <CardDescription>Isi data berikut untuk melanjutkan pembayaran</CardDescription>
+        <p className="text-sm font-medium text-primary" aria-label="Langkah checkout">Langkah 1 dari 2 · Isi data dan pilih pengiriman</p>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -241,7 +253,8 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
 
             <div>
               <Label htmlFor="village">Kelurahan/Desa *</Label>
-              <VillagePicker id="village" value={village} onChange={setVillage} />
+              <VillagePicker id="village" value={village} onChange={(value) => { setVillage(value); setVillageError(""); }} />
+              {villageError && <p role="alert" className="text-sm text-destructive mt-1">{villageError}</p>}
               {village && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {village.district}, {village.regency}, {village.province}
@@ -322,6 +335,13 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
             </div>
           </div>
 
+          {paymentError && (
+            <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              <p>{paymentError}</p>
+              <Button type="submit" variant="outline" size="sm" className="mt-2" disabled={isProcessingPayment}>Coba lagi</Button>
+            </div>
+          )}
+
           <Button
             type="submit"
             className="w-full"
@@ -331,7 +351,7 @@ const CheckoutForm = ({ bookId, bookTitle, bookPrice, onPaymentSuccess }: Checko
             {isProcessingPayment ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
-                Memproses...
+                Membuat tautan pembayaran...
               </>
             ) : (
               <>💳 Lanjutkan ke Pembayaran</>

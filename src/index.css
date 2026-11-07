@@ -20,7 +20,7 @@ All colors MUST be HSL.
 
     /* Bright Yellow Primary */
     --primary: 45 100% 65%;
-    --primary-foreground: 0 0% 100%;
+    --primary-foreground: 45 30% 18%;
     
     /* Soft Orange Secondary */
     --secondary: 35 100% 75%;
@@ -102,11 +102,36 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground font-jakarta;
+    overflow-wrap: anywhere;
+  }
+
+  :focus-visible {
+    outline: 3px solid hsl(25 95% 40%);
+    outline-offset: 3px;
+  }
+
+  img, video, iframe {
+    max-width: 100%;
   }
   
   /* Improve touch targets on mobile */
-  button, a {
+  button, a, input, select, textarea {
     @apply touch-manipulation;
+  }
+
+  @media (max-width: 767px) and (pointer: coarse) {
+    button, a, input:not([type="checkbox"]):not([type="radio"]), select {
+      min-height: 44px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
   
   /* Prevent text size adjustment on iOS */
