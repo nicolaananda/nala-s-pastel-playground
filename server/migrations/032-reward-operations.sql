@@ -1,0 +1,10 @@
+BEGIN;
+CREATE TABLE IF NOT EXISTS member_reward_pickup_settings(id integer PRIMARY KEY CHECK(id=1),location text NOT NULL DEFAULT '',hours text NOT NULL DEFAULT '',instructions text NOT NULL DEFAULT '',updated_at timestamptz NOT NULL DEFAULT now());
+INSERT INTO member_reward_pickup_settings(id) VALUES(1) ON CONFLICT DO NOTHING;
+ALTER TABLE member_reward_redemptions ADD COLUMN IF NOT EXISTS cancellation_reason text;
+ALTER TABLE member_reward_redemptions ADD COLUMN IF NOT EXISTS fulfilled_by text;
+ALTER TABLE member_reward_redemptions ADD COLUMN IF NOT EXISTS fulfilled_at timestamptz;
+CREATE TABLE IF NOT EXISTS member_reward_notifications(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,member_id bigint REFERENCES member_accounts(id),redemption_id bigint REFERENCES member_reward_redemptions(id),kind text NOT NULL,title text NOT NULL,body text NOT NULL,read_at timestamptz,created_at timestamptz NOT NULL DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS member_reward_notification_once ON member_reward_notifications(redemption_id,kind);
+CREATE INDEX IF NOT EXISTS member_reward_notification_member ON member_reward_notifications(member_id,created_at DESC);
+COMMIT;
